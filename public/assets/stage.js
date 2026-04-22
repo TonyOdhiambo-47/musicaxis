@@ -264,14 +264,17 @@ function onOrientation(msg) {
   const clamped = Math.max(0, Math.min(0.9999, raw));
   const targetIdx = Math.floor(clamped * n);
 
-  // Hysteresis — only move zones if gamma crosses a 2.5° band past the boundary
+  // Hysteresis — each zone has a centre at (i + 0.5)/n * 120 - 60.
+  // Only move to a new zone if γ is deeper into it than the current centre by
+  // (zone_width / 2 + ZONE_HYSTERESIS) so edge-jitter can't re-trigger.
   const desired = targetIdx;
   if (state.zoneIdx === -1) {
     state.zoneIdx = desired;
     trigger(scale[desired]);
   } else if (desired !== state.zoneIdx) {
-    const boundary = ((desired + (desired > state.zoneIdx ? 0 : 1)) / n) * 120 - 60;
-    if (Math.abs(msg.gamma - boundary) > ZONE_HYSTERESIS) {
+    const zoneWidth = 120 / n;
+    const currentCentre = (state.zoneIdx + 0.5) * zoneWidth - 60;
+    if (Math.abs(msg.gamma - currentCentre) > zoneWidth / 2 + ZONE_HYSTERESIS) {
       state.zoneIdx = desired;
       trigger(scale[desired]);
     }

@@ -94,10 +94,19 @@ wss.on('connection', (ws, req) => {
       s[role].add(ws);
       s.lastActivity = Date.now();
       ws.send(JSON.stringify({ type: 'joined', role, session: sid }));
-      // Tell stage that a controller connected / disconnected.
-      const status = role === 'controller' ? 'controller-connected' : 'stage-ready';
-      broadcast(s.stage, { type: 'presence', status, controllers: s.controller.size });
+      // Tell stage that a controller connected.
       if (role === 'controller') {
+        broadcast(s.stage, { type: 'presence', status: 'controller-connected', controllers: s.controller.size });
+      }
+      // Tell the new joiner whether a peer is already present, then
+      // tell the existing controllers about any new stage (so they know it's live).
+      const peerCount = role === 'controller' ? s.stage.size : s.controller.size;
+      ws.send(JSON.stringify({
+        type: 'presence',
+        status: peerCount > 0 ? 'paired' : (role === 'controller' ? 'waiting-for-stage' : 'waiting-for-phone'),
+        peers: peerCount,
+      }));
+      if (role === 'stage') {
         broadcast(s.controller, { type: 'presence', status: 'paired', stages: s.stage.size });
       }
       return;
