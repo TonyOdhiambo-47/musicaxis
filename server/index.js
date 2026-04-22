@@ -1,13 +1,14 @@
 // MusicAxis — relay server
-// Desktop (stage) and phone (controller) meet in a session room.
-// Server's only job: forward orientation from the controller to the stage.
-// No audio is transmitted; all audio lives on the desktop.
+// Desktop (stage) and phone (controller) meet in a session room. The only
+// server responsibility is to forward orientation from the controller to
+// the stage. No audio is transmitted; all audio lives on the desktop.
+//
+// Uses Node's standard `http` + `ws` only — no express needed.
 
-const express = require('express');
-const path = require('path');
 const http = require('http');
 const https = require('https');
 const fs = require('fs');
+const path = require('path');
 const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 
@@ -16,34 +17,93 @@ const USE_HTTPS = process.env.HTTPS === '1';
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 const SESSION_TTL_MS = 30 * 60 * 1000;
 
-const app = express();
+// ── Static file server ──────────────────────────────────────────────
+const MIME = {
+  '.html': 'text/html; charset=utf-8',
+  '.css':  'text/css; charset=utf-8',
+  '.js':   'application/javascript; charset=utf-8',
+  '.mjs':  'application/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.svg':  'image/svg+xml',
+  '.png':  'image/png',
+  '.jpg':  'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.ico':  'image/x-icon',
+  '.wav':  'audio/wav',
+  '.mp3':  'audio/mpeg',
+  '.webm': 'audio/webm',
+  '.woff2':'font/woff2',
+  '.woff': 'font/woff',
+  '.ttf':  'font/ttf',
+};
 
-// Routes before static so /play doesn't 301-redirect to /play/
-app.get(['/play', '/play/'], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'play', 'index.html')));
-app.get('/healthz', (_req, res) => res.json({ ok: true, sessions: sessions.size }));
-app.get('/api/session', (_req, res) => {
-  const id = crypto.randomBytes(6).toString('base64url');
-  res.json({ session: id });
-});
+function resolvePath(urlPath) {
+  // Strip query string, decode, and normalize
+  const clean = decodeURIComponent(urlPath.split('?')[0].split('#')[0]);
+  let rel = clean.replace(/^\/+/, '');
+  if (rel === '') rel = 'index.html';
+  if (rel === 'play' || rel === 'play/') rel = 'play/index.html';
+  const full = path.join(PUBLIC_DIR, rel);
+  // Directory traversal guard
+  if (!full.startsWith(PUBLIC_DIR + path.sep) && full !== PUBLIC_DIR) return null;
+  return full;
+}
 
-app.use(express.static(PUBLIC_DIR, { extensions: ['html'], redirect: false }));
+function serveFile(req, res) {
+  const full = resolvePath(req.url);
+  if (!full) { res.writeHead(403).end('forbidden'); return; }
 
+  fs.stat(full, (err, stat) => {
+    let target = full;
+    // If a directory, try index.html
+    if (!err && stat.isDirectory()) target = path.join(full, 'index.html');
+    fs.readFile(target, (err2, data) => {
+      if (err2) { res.writeHead(404, { 'Content-Type': 'text/plain' }).end('not found'); return; }
+      const ext = path.extname(target).toLowerCase();
+      res.writeHead(200, {
+        'Content-Type': MIME[ext] || 'application/octet-stream',
+        'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=300',
+      });
+      res.end(data);
+    });
+  });
+}
+
+function handleRequest(req, res) {
+  const url = req.url || '/';
+  // JSON routes first
+  if (url === '/healthz') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: true, sessions: sessions.size }));
+  }
+  if (url.startsWith('/api/session')) {
+    const id = crypto.randomBytes(6).toString('base64url');
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ session: id }));
+  }
+  // Everything else is a static asset
+  serveFile(req, res);
+}
+
+// ── HTTP(S) server ──────────────────────────────────────────────────
 let server;
 if (USE_HTTPS) {
   const certDir = path.join(__dirname, '..', 'certs');
   try {
     const key = fs.readFileSync(path.join(certDir, 'key.pem'));
     const cert = fs.readFileSync(path.join(certDir, 'cert.pem'));
-    server = https.createServer({ key, cert }, app);
+    server = https.createServer({ key, cert }, handleRequest);
     console.log('[musicaxis] HTTPS mode — self-signed certs loaded');
   } catch (err) {
     console.error('[musicaxis] HTTPS requested but certs missing. Run scripts/make-certs.sh');
     process.exit(1);
   }
 } else {
-  server = http.createServer(app);
+  server = http.createServer(handleRequest);
 }
 
+// ── WebSocket relay ─────────────────────────────────────────────────
 const wss = new WebSocketServer({ server, path: '/ws' });
 
 /** @type {Map<string, { stage: Set<WebSocket>, controller: Set<WebSocket>, lastActivity: number }>} */
@@ -67,7 +127,7 @@ function broadcast(set, payload) {
   }
 }
 
-wss.on('connection', (ws, req) => {
+wss.on('connection', (ws) => {
   ws._role = null;
   ws._session = null;
   ws._alive = true;
@@ -94,12 +154,10 @@ wss.on('connection', (ws, req) => {
       s[role].add(ws);
       s.lastActivity = Date.now();
       ws.send(JSON.stringify({ type: 'joined', role, session: sid }));
-      // Tell stage that a controller connected.
+
       if (role === 'controller') {
         broadcast(s.stage, { type: 'presence', status: 'controller-connected', controllers: s.controller.size });
       }
-      // Tell the new joiner whether a peer is already present, then
-      // tell the existing controllers about any new stage (so they know it's live).
       const peerCount = role === 'controller' ? s.stage.size : s.controller.size;
       ws.send(JSON.stringify({
         type: 'presence',
@@ -118,27 +176,19 @@ wss.on('connection', (ws, req) => {
     if (!s) return;
     s.lastActivity = Date.now();
 
-    // orientation { type:'orient', alpha, beta, gamma, t? }
-    // Controller → stage only.
+    // Controller → stage
     if (type === 'orient' && ws._role === 'controller') {
-      broadcast(s.stage, msg);
-      return;
+      broadcast(s.stage, msg); return;
     }
-
-    // tap / release gestures from controller — treat like orientation relay.
     if ((type === 'tap' || type === 'release' || type === 'strum' || type === 'ping-motion')
         && ws._role === 'controller') {
-      broadcast(s.stage, msg);
-      return;
+      broadcast(s.stage, msg); return;
     }
-
-    // control messages from stage → controller (e.g. change instrument echo)
+    // Stage → controller
     if ((type === 'stage-state' || type === 'haptic') && ws._role === 'stage') {
-      broadcast(s.controller, msg);
-      return;
+      broadcast(s.controller, msg); return;
     }
-
-    // keepalive
+    // Keepalive
     if (type === 'ping') { try { ws.send(JSON.stringify({ type: 'pong', t: Date.now() })); } catch {} }
   });
 
@@ -150,13 +200,11 @@ wss.on('connection', (ws, req) => {
     s.stage.delete(ws);
     s.controller.delete(ws);
     broadcast(s.stage, { type: 'presence', status: 'controller-disconnected', controllers: s.controller.size });
-    if (s.stage.size === 0 && s.controller.size === 0) {
-      sessions.delete(sid);
-    }
+    if (s.stage.size === 0 && s.controller.size === 0) sessions.delete(sid);
   });
 });
 
-// Liveness + TTL sweep — every 30s, drop dead sockets and expired sessions.
+// Liveness + TTL sweep every 30s.
 setInterval(() => {
   const now = Date.now();
   wss.clients.forEach((ws) => {
@@ -170,12 +218,11 @@ setInterval(() => {
       sessions.delete(sid);
     }
   }
-}, 30_000);
+}, 30_000).unref();
 
 server.listen(PORT, () => {
   const proto = USE_HTTPS ? 'https' : 'http';
   console.log(`[musicaxis] ${proto}://localhost:${PORT}`);
   console.log(`[musicaxis] stage: ${proto}://localhost:${PORT}/`);
-  console.log(`[musicaxis] phone: ${proto}://<your-lan-ip>:${PORT}/play?session=<id>`);
+  console.log(`[musicaxis] phone: open the QR shown on the stage, or visit ${proto}://<your-lan-ip>:${PORT}/play?s=<session>`);
 });
-
