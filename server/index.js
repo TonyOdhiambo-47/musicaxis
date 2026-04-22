@@ -17,9 +17,16 @@ const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 const SESSION_TTL_MS = 30 * 60 * 1000;
 
 const app = express();
-app.use(express.static(PUBLIC_DIR, { extensions: ['html'] }));
-app.get('/play', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'play', 'index.html')));
+
+// Routes before static so /play doesn't 301-redirect to /play/
+app.get(['/play', '/play/'], (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'play', 'index.html')));
 app.get('/healthz', (_req, res) => res.json({ ok: true, sessions: sessions.size }));
+app.get('/api/session', (_req, res) => {
+  const id = crypto.randomBytes(6).toString('base64url');
+  res.json({ session: id });
+});
+
+app.use(express.static(PUBLIC_DIR, { extensions: ['html'], redirect: false }));
 
 let server;
 if (USE_HTTPS) {
@@ -163,8 +170,3 @@ server.listen(PORT, () => {
   console.log(`[musicaxis] phone: ${proto}://<your-lan-ip>:${PORT}/play?session=<id>`);
 });
 
-// Expose a session-id generator to the stage via a tiny JSON endpoint (optional).
-app.get('/api/session', (_req, res) => {
-  const id = crypto.randomBytes(6).toString('base64url');
-  res.json({ session: id });
-});

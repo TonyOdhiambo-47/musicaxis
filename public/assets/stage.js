@@ -150,15 +150,14 @@ function setStatus(stateName, text) {
   dom.connText.textContent = text;
 }
 function showQR() {
-  dom.qrWrap.hidden = false;
+  dom.startGate.hidden = state.engineReady;
+  dom.qrWrap.hidden = !state.engineReady;
   dom.vizWrap.hidden = true;
-  dom.startGate.hidden = !dom.startGate.hidden && false;
-  if (state.engineReady) dom.startGate.hidden = true;
 }
 function showVisualizer() {
+  dom.startGate.hidden = true;
   dom.qrWrap.hidden = true;
   dom.vizWrap.hidden = false;
-  dom.startGate.hidden = true;
 }
 
 // ─── Audio engine ───────────────────────────────────────────────────────
