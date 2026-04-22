@@ -2,238 +2,88 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>MusicAxis — the stage</title>
-  <meta name="description" content="Turn your phone into a gyroscope instrument. Tilt, and the stage sings." />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MusicAxis</title>
   <meta name="color-scheme" content="dark" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%230b0a08'/%3E%3Cpath d='M5 3v10M8 5v8M11 2v12' stroke='%23e8a04f' stroke-width='1' stroke-linecap='round'/%3E%3C/svg%3E" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..900,0..100;1,9..144,300..900,0..100&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=JetBrains+Mono:ital,wght@0,400..700;1,400..700&display=swap" rel="stylesheet" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%230b0a08'/%3E%3Cpath d='M5 3v10M8 5v8M11 2v12' stroke='%23e8a04f' stroke-width='1'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="/assets/stage.css" />
 </head>
-<body class="pre-enter">
-  <div class="noise" aria-hidden="true"></div>
-  <div class="vignette" aria-hidden="true"></div>
-
-  <header class="masthead">
-    <div class="mast-row mast-top">
-      <span class="rule-left" aria-hidden="true"></span>
-      <span class="dateline" id="dateline">— / — / —</span>
-      <span class="edition">EDITION Nº 001</span>
-      <span class="rule-right" aria-hidden="true"></span>
-    </div>
-    <h1 class="wordmark" aria-label="MusicAxis">
-      <span class="wm-m">M</span><span class="wm-u">u</span><span class="wm-s">s</span><span class="wm-i">i</span><span class="wm-c">c</span><span class="wm-a1"><i>A</i></span><span class="wm-x">x</span><span class="wm-i2">i</span><span class="wm-s2">s</span>
-    </h1>
-    <p class="tagline">Tilt a phone. The stage sings. <em>A small conductor's ritual, rebuilt in browser.</em></p>
-    <div class="mast-row mast-bottom">
-      <span class="rule-left" aria-hidden="true"></span>
-      <span class="meta" id="meta-instrument">INSTR · GRAND PIANO</span>
-      <span class="meta" id="meta-scale">SCALE · A MINOR PENTATONIC</span>
-      <span class="meta" id="meta-session">SESSION · —</span>
-      <span class="rule-right" aria-hidden="true"></span>
-    </div>
+<body>
+  <header>
+    <h1>MusicAxis</h1>
+    <p class="sub">phone = baton · desktop = instrument</p>
   </header>
 
-  <main class="layout">
-
-    <!-- LEFT: the pairing column — starts with a big "START SESSION" plate, then QR, then connection log -->
-    <section class="col-left" aria-label="pairing">
-      <div class="plate plate-qr" id="plate-qr">
-        <div class="plate-head">
-          <span class="plate-no">Nº 01</span>
-          <span class="plate-label">CONDUCT</span>
-        </div>
-
-        <div class="qr-stage" id="qr-stage">
-          <!-- Pre-audio gate -->
-          <div class="start-gate" id="start-gate">
-            <button class="start-btn" id="start-btn" type="button">
-              <span class="start-ring" aria-hidden="true"></span>
-              <span class="start-text">Enter the hall</span>
-              <span class="start-hint">one tap to wake the instruments</span>
-            </button>
-          </div>
-
-          <!-- QR (shown after start, hidden when paired) -->
-          <div class="qr-wrap" id="qr-wrap" hidden>
-            <div class="qr-frame">
-              <span class="corner tl"></span><span class="corner tr"></span>
-              <span class="corner bl"></span><span class="corner br"></span>
-              <div class="qr-canvas" id="qr-canvas"></div>
-            </div>
-            <p class="qr-caption">
-              <span class="kicker">SCAN TO CONDUCT</span>
-              <span class="qr-url" id="qr-url">—</span>
-            </p>
-          </div>
-
-          <!-- Visualizer (shown when paired) -->
-          <div class="viz-wrap" id="viz-wrap" hidden>
-            <svg class="viz" viewBox="0 0 320 320" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-              <defs>
-                <radialGradient id="halo" cx="50%" cy="50%" r="60%">
-                  <stop offset="0%" stop-color="var(--amber)" stop-opacity="0.55" />
-                  <stop offset="55%" stop-color="var(--amber)" stop-opacity="0.06" />
-                  <stop offset="100%" stop-color="var(--amber)" stop-opacity="0" />
-                </radialGradient>
-                <linearGradient id="forkGrad" x1="50%" y1="0%" x2="50%" y2="100%">
-                  <stop offset="0%" stop-color="var(--cream)" stop-opacity="0.95" />
-                  <stop offset="100%" stop-color="var(--amber)" stop-opacity="0.75" />
-                </linearGradient>
-              </defs>
-              <circle id="viz-halo" cx="160" cy="160" r="140" fill="url(#halo)" />
-              <g id="viz-corona" transform="translate(160 160)">
-                <circle r="128" fill="none" stroke="var(--ember)" stroke-opacity="0.18" stroke-dasharray="2 8" />
-                <circle r="96" fill="none" stroke="var(--amber)" stroke-opacity="0.28" stroke-dasharray="1 14" />
-              </g>
-              <g id="viz-fork" transform="translate(160 160)">
-                <line x1="0" y1="-110" x2="0" y2="110" stroke="url(#forkGrad)" stroke-width="3" stroke-linecap="round" />
-                <line x1="-22" y1="-80" x2="-22" y2="40" stroke="url(#forkGrad)" stroke-width="2" stroke-linecap="round" stroke-opacity="0.75" />
-                <line x1="22"  y1="-80" x2="22"  y2="40" stroke="url(#forkGrad)" stroke-width="2" stroke-linecap="round" stroke-opacity="0.75" />
-                <circle cx="0" cy="118" r="9" fill="var(--amber)" />
-              </g>
-              <g id="viz-noteRing" transform="translate(160 160)" opacity="0">
-                <circle r="60" fill="none" stroke="var(--cream)" stroke-width="1.2" />
-              </g>
-            </svg>
-            <div class="viz-caption">
-              <span class="kicker">LIVE · <span id="viz-note">—</span></span>
-              <span class="viz-values" id="viz-values">α — · β — · γ —</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="plate-foot">
-          <span class="status-dot" id="conn-dot" data-state="idle" aria-hidden="true"></span>
-          <span class="status-text" id="conn-text">waiting for the hall to open…</span>
-        </div>
+  <main>
+    <section class="panel">
+      <div id="start-wrap">
+        <button id="start-btn" type="button">Start</button>
+        <p class="hint">tap to wake the engine</p>
       </div>
 
-      <!-- pairing log (small, typographic) -->
-      <ol class="ritual" aria-label="ritual">
-        <li><span class="num">i.</span><span>tap to unlock the engine</span></li>
-        <li><span class="num">ii.</span><span>scan the mark with your phone</span></li>
-        <li><span class="num">iii.</span><span>grant motion · iOS asks once</span></li>
-        <li><span class="num">iv.</span><span>tilt to conduct · press record to remember</span></li>
-      </ol>
+      <div id="qr-wrap" hidden>
+        <div id="qr"></div>
+        <p class="url" id="qr-url">—</p>
+        <p class="hint">scan with phone · or open this URL</p>
+      </div>
+
+      <div id="viz-wrap" hidden>
+        <div id="viz"><div id="viz-dot"></div></div>
+        <p class="note" id="note">—</p>
+        <p class="values" id="values">α — · β — · γ —</p>
+      </div>
+
+      <p class="status"><span id="dot"></span><span id="status">idle</span></p>
     </section>
 
-    <!-- RIGHT: the console — instrument cards, scale selector, BPM, transport, library -->
-    <section class="col-right" aria-label="console">
-      <div class="plate plate-instruments">
-        <div class="plate-head">
-          <span class="plate-no">Nº 02</span>
-          <span class="plate-label">INSTRUMENTS</span>
+    <section class="panel controls">
+      <fieldset>
+        <legend>instrument</legend>
+        <div class="pills">
+          <button class="pill active" data-inst="piano">Piano</button>
+          <button class="pill" data-inst="synth">Synth</button>
+          <button class="pill" data-inst="strings">Strings</button>
+          <button class="pill" data-inst="marimba">Marimba</button>
         </div>
-        <div class="inst-grid" role="radiogroup" aria-label="instrument">
-          <button class="inst active" role="radio" aria-checked="true" data-inst="piano">
-            <span class="inst-letter" aria-hidden="true">P</span>
-            <span class="inst-name">Grand Piano</span>
-            <span class="inst-sub">Salamander · 88 keys</span>
-            <svg class="inst-glyph" viewBox="0 0 40 40" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.1"><rect x="4" y="6" width="32" height="28" rx="1.2"/><path d="M10 6v28M16 6v28M22 6v28M28 6v28M34 6v28"/><rect x="12" y="6" width="3" height="17" fill="currentColor"/><rect x="18" y="6" width="3" height="17" fill="currentColor"/><rect x="30" y="6" width="3" height="17" fill="currentColor"/></g></svg>
-          </button>
-          <button class="inst" role="radio" aria-checked="false" data-inst="synth">
-            <span class="inst-letter" aria-hidden="true">S</span>
-            <span class="inst-name">Analog Synth</span>
-            <span class="inst-sub">warm triangle · poly</span>
-            <svg class="inst-glyph" viewBox="0 0 40 40" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M4 20 L10 10 L16 30 L22 10 L28 30 L34 20"/><circle cx="8" cy="34" r="1.2" fill="currentColor"/><circle cx="20" cy="34" r="1.2" fill="currentColor"/><circle cx="32" cy="34" r="1.2" fill="currentColor"/></g></svg>
-          </button>
-          <button class="inst" role="radio" aria-checked="false" data-inst="strings">
-            <span class="inst-letter" aria-hidden="true">V</span>
-            <span class="inst-name">Strings Hall</span>
-            <span class="inst-sub">saw · long reverb</span>
-            <svg class="inst-glyph" viewBox="0 0 40 40" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"><path d="M8 4 Q20 20 8 36"/><path d="M16 4 Q28 20 16 36"/><path d="M24 4 Q36 20 24 36"/><path d="M32 4 Q44 20 32 36"/></g></svg>
-          </button>
-          <button class="inst" role="radio" aria-checked="false" data-inst="marimba">
-            <span class="inst-letter" aria-hidden="true">M</span>
-            <span class="inst-name">Marimba</span>
-            <span class="inst-sub">wood · soft mallets</span>
-            <svg class="inst-glyph" viewBox="0 0 40 40" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.2"><rect x="6" y="12" width="5" height="18" rx="0.8"/><rect x="13" y="9"  width="5" height="22" rx="0.8"/><rect x="20" y="11" width="5" height="20" rx="0.8"/><rect x="27" y="8"  width="5" height="24" rx="0.8"/></g></svg>
-          </button>
-        </div>
-      </div>
+      </fieldset>
 
-      <div class="plate plate-scale">
-        <div class="plate-head">
-          <span class="plate-no">Nº 03</span>
-          <span class="plate-label">SCALE · TEMPO</span>
+      <fieldset>
+        <legend>scale</legend>
+        <div class="pills">
+          <button class="pill active" data-scale="minor_pentatonic">A minor pent.</button>
+          <button class="pill" data-scale="major_pentatonic">C major pent.</button>
+          <button class="pill" data-scale="blues">A blues</button>
+          <button class="pill" data-scale="chromatic">Chromatic</button>
         </div>
-        <div class="scale-row" role="radiogroup" aria-label="scale">
-          <button class="chip active" role="radio" aria-checked="true"  data-scale="minor_pentatonic">A minor pent.</button>
-          <button class="chip"        role="radio" aria-checked="false" data-scale="major_pentatonic">C major pent.</button>
-          <button class="chip"        role="radio" aria-checked="false" data-scale="blues">A blues</button>
-          <button class="chip"        role="radio" aria-checked="false" data-scale="chromatic">Chromatic</button>
-        </div>
-        <div class="tempo-row">
-          <label class="tempo-label" for="bpm">BPM</label>
-          <input type="range" id="bpm" min="40" max="200" step="1" value="96" />
-          <output class="tempo-val" id="bpm-val" for="bpm">96</output>
-        </div>
-        <div class="hint">
-          <span class="kicker">HOW TO PLAY</span>
-          <span>tilt <b>left / right</b> to travel the scale · tilt <b>forward</b> for louder · <b>rotate</b> for reverb</span>
-        </div>
-        <div class="hint" style="margin-top:4px">
-          <span class="kicker">TRY</span>
-          <span><i>Dance Monkey</i> · <i>Snowman</i> · <i>Despacito</i> — the pentatonic catches them all</span>
-        </div>
-      </div>
+      </fieldset>
 
-      <div class="plate plate-transport">
-        <div class="plate-head">
-          <span class="plate-no">Nº 04</span>
-          <span class="plate-label">TRANSPORT</span>
+      <fieldset>
+        <legend>record</legend>
+        <div class="rec-row">
+          <button id="rec-btn" type="button">Record</button>
+          <span class="time" id="rec-time">00:00.0</span>
         </div>
-        <div class="transport">
-          <button class="rec" id="rec-btn" type="button" aria-pressed="false">
-            <span class="rec-inner" aria-hidden="true"></span>
-            <span class="rec-label" id="rec-label">Record</span>
-          </button>
-          <div class="rec-meter">
-            <span class="rec-time" id="rec-time">00:00.0</span>
-            <div class="rec-wave" id="rec-wave" aria-hidden="true">
-              <svg viewBox="0 0 160 28" preserveAspectRatio="none"><polyline id="rec-wave-line" fill="none" stroke="currentColor" stroke-width="1.2" points="" /></svg>
-            </div>
-          </div>
-        </div>
-      </div>
+      </fieldset>
 
-      <div class="plate plate-library">
-        <div class="plate-head">
-          <span class="plate-no">Nº 05</span>
-          <span class="plate-label">LIBRARY</span>
-        </div>
-        <ol class="library" id="library" aria-live="polite">
-          <li class="library-empty">the ledger is empty · record something worth remembering</li>
-        </ol>
-      </div>
+      <fieldset>
+        <legend>library</legend>
+        <ol id="library"><li class="empty">no recordings yet</li></ol>
+      </fieldset>
     </section>
   </main>
 
-  <footer class="colophon">
-    <span>MUSICAXIS · a two-page instrument for browser + phone</span>
-    <span class="dot">·</span>
-    <span>built with Tone.js + ws · no audio leaves this machine</span>
-    <span class="dot">·</span>
-    <a href="https://github.com/TonyOdhiambo-47/musicaxis" target="_blank" rel="noopener">source</a>
-  </footer>
+  <footer>tilt left/right = pitch · forward = volume · rotate = reverb</footer>
 
-  <!-- Modal: loading samples -->
-  <div class="loader" id="loader" hidden>
-    <div class="loader-card">
-      <span class="loader-ring" aria-hidden="true"></span>
-      <h2 class="loader-title" id="loader-title">Tuning the piano</h2>
-      <p class="loader-sub" id="loader-sub">loading piano samples · a short moment</p>
-      <div class="loader-bar"><span id="loader-fill"></span></div>
+  <div id="loader" hidden>
+    <div>
+      <div class="ring"></div>
+      <p id="loader-title">loading</p>
+      <div class="bar"><span id="loader-fill"></span></div>
     </div>
   </div>
 
-  <!-- Libraries -->
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.min.js"></script>
-
   <script type="module" src="/assets/stage.js"></script>
 </body>
 </html>

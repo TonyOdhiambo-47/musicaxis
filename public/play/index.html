@@ -2,119 +2,46 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover,user-scalable=no" />
-  <meta name="theme-color" content="#0b0a08" />
-  <title>MusicAxis — controller</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+  <title>MusicAxis · play</title>
   <meta name="color-scheme" content="dark" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%230b0a08'/%3E%3Cpath d='M5 3v10M8 5v8M11 2v12' stroke='%23e8a04f' stroke-width='1' stroke-linecap='round'/%3E%3C/svg%3E" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..900,0..100;1,9..144,300..900,0..100&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <meta name="theme-color" content="#0b0a08" />
   <link rel="stylesheet" href="/assets/play.css" />
 </head>
-<body class="pre-enter">
-  <div class="noise" aria-hidden="true"></div>
-  <div class="vignette" aria-hidden="true"></div>
+<body>
+  <h1>MusicAxis</h1>
 
-  <main class="screen" id="screen">
-    <header class="head">
-      <span class="rule" aria-hidden="true"></span>
-      <span class="kicker">THE BATON</span>
-      <span class="rule" aria-hidden="true"></span>
-    </header>
+  <section id="ios" hidden>
+    <p>iOS needs motion permission</p>
+    <button id="btn-enable">Enable motion</button>
+  </section>
 
-    <h1 class="wordmark" aria-label="MusicAxis">
-      <span>M</span><span>U</span><span>S</span><span>I</span><span>C</span><i>A</i><span>X</span><span>I</span><span>S</span>
-    </h1>
-    <p class="tagline">a phone held up to a sleeping orchestra.</p>
+  <section id="connect" hidden>
+    <p>session <b id="sid">—</b></p>
+    <button id="btn-join">Connect</button>
+  </section>
 
-    <!-- Stage 1 — iOS permission gate -->
-    <section class="stage stage-ios" id="stage-ios" hidden>
-      <div class="instructions">
-        <h2>enable motion</h2>
-        <p>iOS asks for permission before the phone can act as a gyroscope. tap once to grant it.</p>
-      </div>
-      <button class="big-btn" id="btn-enable" type="button">
-        <span class="big-btn-ring"></span>
-        <span class="big-btn-text">Grant motion</span>
-        <span class="big-btn-hint">one tap · iOS only</span>
-      </button>
-    </section>
+  <section id="live" hidden>
+    <div id="dot"></div>
+    <p class="hints">
+      tilt L/R · pitch<br>
+      tilt forward · louder<br>
+      rotate · reverb
+    </p>
+    <button id="btn-tap">Tap note</button>
+  </section>
 
-    <!-- Stage 2 — connect -->
-    <section class="stage stage-connect" id="stage-connect" hidden>
-      <div class="instructions">
-        <h2>join the hall</h2>
-        <p>session <b id="session-code">—</b></p>
-      </div>
-      <button class="big-btn" id="btn-join" type="button">
-        <span class="big-btn-ring"></span>
-        <span class="big-btn-text">Connect</span>
-        <span class="big-btn-hint">opens a live channel</span>
-      </button>
-    </section>
+  <section id="err" hidden>
+    <p>open the stage on a laptop and scan the QR with your phone.</p>
+  </section>
 
-    <!-- Stage 3 — connected, tilting -->
-    <section class="stage stage-live" id="stage-live" hidden>
-      <div class="fork" aria-hidden="true">
-        <svg viewBox="0 0 300 300" preserveAspectRatio="xMidYMid meet">
-          <defs>
-            <radialGradient id="halo-p" cx="50%" cy="50%" r="60%">
-              <stop offset="0%" stop-color="var(--amber)" stop-opacity="0.55" />
-              <stop offset="60%" stop-color="var(--amber)" stop-opacity="0.05" />
-              <stop offset="100%" stop-color="var(--amber)" stop-opacity="0" />
-            </radialGradient>
-            <linearGradient id="pipe" x1="50%" y1="0%" x2="50%" y2="100%">
-              <stop offset="0%" stop-color="var(--cream)" stop-opacity="1" />
-              <stop offset="100%" stop-color="var(--amber)" stop-opacity="0.8" />
-            </linearGradient>
-          </defs>
-          <circle id="p-halo" cx="150" cy="150" r="130" fill="url(#halo-p)" />
-          <g id="p-corona" transform="translate(150 150)">
-            <circle r="112" fill="none" stroke="var(--amber)" stroke-opacity="0.25" stroke-dasharray="1 12"/>
-            <circle r="84"  fill="none" stroke="var(--ember)" stroke-opacity="0.18" stroke-dasharray="2 8"/>
-          </g>
-          <g id="p-fork" transform="translate(150 150)">
-            <line x1="0" y1="-100" x2="0" y2="100" stroke="url(#pipe)" stroke-width="3" stroke-linecap="round"/>
-            <line x1="-20" y1="-72" x2="-20" y2="40" stroke="url(#pipe)" stroke-width="2" stroke-linecap="round" stroke-opacity="0.7"/>
-            <line x1="20"  y1="-72" x2="20"  y2="40" stroke="url(#pipe)" stroke-width="2" stroke-linecap="round" stroke-opacity="0.7"/>
-            <circle cx="0" cy="108" r="8" fill="var(--amber)" />
-          </g>
-        </svg>
-      </div>
+  <footer>
+    <span id="sdot"></span>
+    <span id="stext">idle</span>
+  </footer>
 
-      <div class="callouts">
-        <div class="callout"><span class="kicker">TILT</span><span>to travel the scale</span></div>
-        <div class="callout"><span class="kicker">PUSH</span><span>to play louder</span></div>
-        <div class="callout"><span class="kicker">ROTATE</span><span>to swell reverb</span></div>
-      </div>
-
-      <button class="tap-btn" id="btn-tap" type="button">
-        <span>Tap a note</span>
-        <small>re-trigger the current zone</small>
-      </button>
-    </section>
-
-    <!-- Stage 4 — pre-join error -->
-    <section class="stage stage-error" id="stage-error" hidden>
-      <div class="instructions">
-        <h2>no session in the URL</h2>
-        <p>open the stage on a laptop, scan the QR with this phone's camera, and you'll land here already wired up.</p>
-      </div>
-    </section>
-
-    <footer class="foot">
-      <span class="status-dot" id="s-dot" data-state="idle"></span>
-      <span class="status-text" id="s-text">idle</span>
-    </footer>
-  </main>
-
-  <!-- Orientation readout: small, bottom corner, for debugging -->
-  <div class="readout" id="readout" hidden>
-    <span>α <b id="r-alpha">—</b></span>
-    <span>β <b id="r-beta">—</b></span>
-    <span>γ <b id="r-gamma">—</b></span>
-    <span id="r-zone">·</span>
+  <div class="readout" id="ro" hidden>
+    α <b id="ra">—</b> · β <b id="rb">—</b> · γ <b id="rg">—</b>
   </div>
 
   <script src="/assets/play.js"></script>
