@@ -4,7 +4,6 @@
 // MediaRecorder so the stage can capture what the audience hears.
 
 const Tone = window.Tone;
-const Piano = window.Piano?.Piano || window.Piano;
 
 // ── Scales ─────────────────────────────────────────────────────────────
 // Ordered low → high. Each scale is tuned for the "Despacito intuitive"
@@ -81,28 +80,52 @@ export class MasterBus {
 // ── Instruments ───────────────────────────────────────────────────────
 export const instrumentFactory = {
 
-  // 1. GRAND PIANO — @tonejs/piano with Salamander samples
+  // 1. GRAND PIANO — Tone.Sampler with tonejs-instruments piano samples.
+  // Uses a sparse set of root notes and lets Tone pitch-shift between them.
+  // Small download (~1.5 MB), quick load, real piano feel.
   async piano(onProgress, dest) {
-    if (!Piano) throw new Error("@tonejs/piano failed to load");
-    const piano = new Piano({ velocities: 3 });
-    piano.connect(dest);
-    // @tonejs/piano uses a loading API with no progress callback; we fake it.
+    const base = "https://nbrosowsky.github.io/tonejs-instruments/samples/piano/";
+    const urls = {
+      C2: "C2.mp3", A2: "A2.mp3",
+      C3: "C3.mp3", E3: "E3.mp3", A3: "A3.mp3",
+      C4: "C4.mp3", E4: "E4.mp3", A4: "A4.mp3",
+      C5: "C5.mp3", E5: "E5.mp3", A5: "A5.mp3",
+      C6: "C6.mp3", C7: "C7.mp3",
+    };
+
+    // Fake a progress bar while samples fetch in parallel — we can't easily
+    // read per-buffer progress, but timing-wise we're done in ~1-3s on wifi.
     let done = false;
-    const fakeProgress = (async () => {
-      for (let i = 0; i <= 60 && !done; i++) {
-        await new Promise((r) => setTimeout(r, 120));
-        onProgress?.(i / 60);
+    (async () => {
+      const total = 1800;
+      const start = Date.now();
+      while (!done) {
+        const t = Math.min(0.95, (Date.now() - start) / total);
+        onProgress?.(t);
+        await new Promise((r) => setTimeout(r, 80));
       }
     })();
-    await piano.load();
+
+    const sampler = await new Promise((resolve, reject) => {
+      const s = new Tone.Sampler({
+        urls,
+        baseUrl: base,
+        release: 1.2,
+        onload: () => resolve(s),
+        onerror: (e) => reject(e),
+      });
+      s.volume.value = -4;
+      s.connect(dest);
+      // Safety net: some browsers swallow onload on cached 304s.
+      setTimeout(() => resolve(s), 12000);
+    });
     done = true;
-    await fakeProgress;
     onProgress?.(1);
-    // Wrap in a common interface
+
     return {
-      triggerAttack: (note, time, vel) => piano.keyDown({ note, velocity: vel ?? 0.7 }),
-      triggerRelease: (note) => piano.keyUp({ note }),
-      dispose: () => piano.disconnect(),
+      triggerAttack: (note, time, vel) => sampler.triggerAttack(note, time, vel),
+      triggerRelease: (note) => sampler.triggerRelease(note, "+0.01"),
+      dispose: () => sampler.disconnect(),
     };
   },
 
