@@ -1,0 +1,23 @@
+{
+  "name": "musicaxis",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Turn your phone into a gyroscope instrument. Desktop is the stage, phone is the baton.",
+  "main": "server/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node server/index.js",
+    "start:https": "HTTPS=1 node server/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "qrcode": "^1.5.4",
+    "ws": "^8.18.0"
+  },
+  "author": "Tony Odhiambo <tonyrotich2580@gmail.com>",
+  "license": "MIT"
+}
