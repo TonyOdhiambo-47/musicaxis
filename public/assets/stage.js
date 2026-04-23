@@ -228,6 +228,7 @@ function onOrient(msg) {
   state.orient.beta = msg.beta || 0;
   state.orient.gamma = msg.gamma || 0;
   updateViz();
+  pushPreview();
   if (state.holding) slideToCurrentZone();
   if (master) {
     const wet = Math.min(0.5, Math.abs(state.orient.alpha - 180) / 180 * 0.5);
@@ -244,11 +245,24 @@ function updateViz() {
   dom.values.textContent = `α ${Math.round(state.orient.alpha)} · β ${Math.round(state.orient.beta)} · γ ${Math.round(state.orient.gamma)}`;
 }
 
+// γ ∈ [-80, 80] → 0..scale.length-1. Using β (pitch) too would feel
+// confusing, so one axis does the melody and β only brightens the tone.
 function currentZoneNote() {
   const scale = SCALES[state.scale];
-  const raw = (state.orient.gamma + 60) / 120;
+  const g = Math.max(-80, Math.min(80, state.orient.gamma));
+  const raw = (g + 80) / 160;
   const idx = Math.max(0, Math.min(scale.length - 1, Math.floor(raw * scale.length)));
   return scale[idx];
+}
+
+// Tell the phone what note it would play right now — so the user can aim.
+let previewNote = null;
+function pushPreview() {
+  if (!state.paired || !ws || ws.readyState !== WebSocket.OPEN) return;
+  const note = currentZoneNote();
+  if (note === previewNote) return;
+  previewNote = note;
+  try { ws.send(JSON.stringify({ type: "note", note })); } catch {}
 }
 
 function velocity(beta) {
