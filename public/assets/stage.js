@@ -1,4 +1,4 @@
-import { SCALES, instrumentFactory, MasterBus } from "/assets/engine.js";
+import { SCALES, SCALE_ROOT, instrumentFactory, MasterBus, DroneBed } from "/assets/engine.js";
 
 const $ = (id) => document.getElementById(id);
 const dom = {
@@ -25,7 +25,7 @@ const dom = {
 };
 
 const state = {
-  currentInst: "piano",
+  currentInst: "synth",
   scale: "minor_pentatonic",
   orient: { alpha: 0, beta: 0, gamma: 0 },
   holding: false,
@@ -155,7 +155,8 @@ async function renderQR() {
 }
 
 // audio
-let master, instruments = {}, activeInst = null;
+let master, drone, instruments = {}, activeInst = null;
+let droneTimeout = null;
 async function startEngine() {
   if (state.engineReady) return;
   dom.startBtn.disabled = true;
@@ -167,6 +168,8 @@ async function startEngine() {
     await Tone.start();
     Tone.Destination.volume.value = -4;
     master = new MasterBus();
+    drone = new DroneBed(master.input);
+    drone.setRoot(SCALE_ROOT[state.scale] || "A");
 
     showLoader("tuning piano", 0.05);
     instruments.piano = await instrumentFactory.piano((p) => setFill(p * 0.7), master.input);
@@ -217,6 +220,7 @@ dom.scales.forEach((b) => b.addEventListener("click", () => {
   state.scale = b.dataset.scale;
   previewKey = "";
   pushPreview();
+  if (drone) drone.setRoot(SCALE_ROOT[state.scale] || "A");
 }));
 
 // ─── Orientation / note mapping ─────────────────────────────────
@@ -301,7 +305,7 @@ function holdStart() {
   if (!activeInst) return;
   const note = currentZoneNote();
   try {
-    if (heldNote) activeInst.triggerRelease?.(heldNote);
+    if (heldNote && !activeInst.mono) activeInst.triggerRelease?.(heldNote);
     activeInst.triggerAttack(note, undefined, velocity(state.orient.beta));
     heldNote = note;
     state.holding = true;
@@ -309,15 +313,39 @@ function holdStart() {
     dom.note.textContent = note;
     renderDebug();
   } catch (e) { console.error("trigger failed", e); }
+  // Fade the drone in on first tap and keep it alive while we're playing.
+  if (drone) {
+    drone.setRoot(SCALE_ROOT[state.scale] || "A");
+    drone.fadeIn();
+    if (droneTimeout) { clearTimeout(droneTimeout); droneTimeout = null; }
+  }
 }
 function holdEnd() {
   state.holding = false;
   if (heldNote && activeInst) { try { activeInst.triggerRelease(heldNote); } catch {} }
   heldNote = null;
+  // Linger the drone briefly; fade it out if nobody comes back.
+  if (drone) {
+    if (droneTimeout) clearTimeout(droneTimeout);
+    droneTimeout = setTimeout(() => { drone.fadeOut(); }, 4000);
+  }
 }
+// On mono instruments this is a true continuous glide. On samplers we
+// retrigger when the zone actually changes.
 function slideToCurrentZone() {
   if (!activeInst || !state.holding) return;
   const note = currentZoneNote();
+  if (activeInst.mono) {
+    // Continuous portamento — slide.
+    try { activeInst.slide?.(note); } catch {}
+    if (note !== heldNote) {
+      heldNote = note;
+      state.lastNote = note;
+      dom.note.textContent = note;
+      renderDebug();
+    }
+    return;
+  }
   if (note === heldNote) return;
   const now = performance.now();
   if (now - state.lastTriggerAt < 35) return;

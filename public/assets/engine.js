@@ -5,6 +5,15 @@
 
 const Tone = window.Tone;
 
+// For each scale, the root we drone against (gives every note harmonic context)
+export const SCALE_ROOT = {
+  minor_pentatonic: "A",
+  major_pentatonic: "C",
+  major: "C",
+  blues: "A",
+  chromatic: "A",
+};
+
 // ── Scales ─────────────────────────────────────────────────────────────
 // Ordered low → high. Each scale is tuned for the "Despacito intuitive"
 // feel: every note is in key, so sweeping gamma across the phone plays
@@ -130,6 +139,7 @@ export const instrumentFactory = {
     onProgress?.(1);
 
     return {
+      mono: false,
       triggerAttack: (note, time, vel) => {
         if (handle.loaded && sampler) sampler.triggerAttack(note, time, vel);
         else fallback.triggerAttack(note, time, vel);
@@ -142,35 +152,45 @@ export const instrumentFactory = {
     };
   },
 
-  // 2. SYNTH — warm poly
+  // 2. SYNTH — mono with PORTAMENTO. Holding + tilting glides pitch smoothly
+  // (theremin / ocarina feel). Fat triangle + touch of saw for body.
   synth(dest) {
-    const synth = new Tone.PolySynth(Tone.Synth, {
+    const synth = new Tone.MonoSynth({
+      portamento: 0.08,
       oscillator: { type: "triangle" },
-      envelope: { attack: 0.05, decay: 0.3, sustain: 0.4, release: 1.2 },
+      envelope: { attack: 0.02, decay: 0.2, sustain: 0.8, release: 0.7 },
+      filterEnvelope: { attack: 0.01, decay: 0.15, sustain: 0.6, release: 0.6, baseFrequency: 800, octaves: 2.5 },
     });
-    synth.volume.value = -10;
-    synth.connect(dest);
+    const chorus = new Tone.Chorus({ frequency: 0.8, delayTime: 3, depth: 0.6, wet: 0.4 }).start();
+    synth.volume.value = -6;
+    synth.chain(chorus, dest);
     return {
+      mono: true,
       triggerAttack: (note, time, vel) => synth.triggerAttack(note, time, vel),
-      triggerRelease: (note) => synth.triggerRelease(note),
-      dispose: () => synth.disconnect(),
+      triggerRelease: (note) => synth.triggerRelease(),
+      slide: (note) => synth.setNote(note),
+      dispose: () => { synth.disconnect(); chorus.disconnect(); },
     };
   },
 
-  // 3. STRINGS — saw poly through its own reverb + lowpass
+  // 3. STRINGS — mono saw with deep portamento + reverb → cello/violin feel
   strings(dest) {
-    const reverb = new Tone.Reverb({ decay: 3, wet: 0.45 });
+    const reverb = new Tone.Reverb({ decay: 4, wet: 0.55 });
     reverb.generate();
-    const filter = new Tone.Filter({ type: "lowpass", frequency: 1200, Q: 0.6 });
-    const synth = new Tone.PolySynth(Tone.Synth, {
+    const filter = new Tone.Filter({ type: "lowpass", frequency: 1800, Q: 0.8 });
+    const synth = new Tone.MonoSynth({
+      portamento: 0.12,
       oscillator: { type: "sawtooth" },
-      envelope: { attack: 0.35, decay: 0.25, sustain: 0.8, release: 1.8 },
+      envelope: { attack: 0.35, decay: 0.3, sustain: 0.85, release: 1.8 },
+      filterEnvelope: { attack: 0.35, decay: 0.25, sustain: 0.6, release: 1.5, baseFrequency: 600, octaves: 3 },
     });
-    synth.volume.value = -14;
+    synth.volume.value = -10;
     synth.chain(filter, reverb, dest);
     return {
+      mono: true,
       triggerAttack: (note, time, vel) => synth.triggerAttack(note, time, vel),
-      triggerRelease: (note) => synth.triggerRelease(note),
+      triggerRelease: () => synth.triggerRelease(),
+      slide: (note) => synth.setNote(note),
       dispose: () => { synth.disconnect(); filter.disconnect(); reverb.disconnect(); },
     };
   },
@@ -193,9 +213,59 @@ export const instrumentFactory = {
     sampler.connect(dest);
     await Tone.loaded();
     return {
+      mono: false,
       triggerAttack: (note, time, vel) => sampler.triggerAttack(note, time, vel),
       triggerRelease: (note) => sampler.triggerRelease(note, "+0.01"),
       dispose: () => sampler.disconnect(),
     };
   },
 };
+
+// ── Drone bed ─────────────────────────────────────────────────────────
+// A soft root + fifth pad that plays underneath everything once the
+// performer starts playing. Gives every note harmonic context so nothing
+// sounds wrong. Fades in on first touch, fades out after silence.
+export class DroneBed {
+  constructor(dest) {
+    this.filter = new Tone.Filter({ type: "lowpass", frequency: 800, Q: 0.4 });
+    this.reverb = new Tone.Reverb({ decay: 6, wet: 0.7 });
+    this.reverb.generate();
+    this.gain = new Tone.Gain(0);
+    this.pad = new Tone.PolySynth(Tone.AMSynth, {
+      harmonicity: 1.2,
+      oscillator: { type: "sine" },
+      modulation: { type: "triangle" },
+      envelope: { attack: 2, decay: 1, sustain: 0.85, release: 3 },
+      modulationEnvelope: { attack: 2.5, decay: 0.5, sustain: 0.8, release: 2 },
+    });
+    this.pad.volume.value = -14;
+    this.pad.chain(this.filter, this.reverb, this.gain, dest);
+    this.playing = false;
+    this.root = "A";
+    this.lastRoot = null;
+  }
+  setRoot(pitchClass) { this.root = pitchClass; this._restartIfNeeded(); }
+  fadeIn() {
+    if (this.playing) return;
+    this.playing = true;
+    const r = `${this.root}2`;
+    const f = `${this.root === "C" ? "G" : this.root === "A" ? "E" : "G"}2`;
+    this.pad.triggerAttack([r, f]);
+    this.lastRoot = this.root;
+    this.gain.gain.rampTo(0.7, 2.5);
+  }
+  fadeOut() {
+    if (!this.playing) return;
+    this.playing = false;
+    this.gain.gain.rampTo(0, 3);
+    setTimeout(() => { try { this.pad.releaseAll(); } catch {} }, 3200);
+  }
+  _restartIfNeeded() {
+    if (!this.playing || this.root === this.lastRoot) return;
+    try { this.pad.releaseAll(); } catch {}
+    const r = `${this.root}2`;
+    const f = `${this.root === "C" ? "G" : this.root === "A" ? "E" : "G"}2`;
+    this.pad.triggerAttack([r, f]);
+    this.lastRoot = this.root;
+  }
+}
