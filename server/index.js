@@ -10,7 +10,19 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const os = require('os');
 const { WebSocketServer } = require('ws');
+
+// Pick the first non-internal IPv4 address so we can advertise it in the QR.
+function getLanHost() {
+  const nets = os.networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const n of nets[name] || []) {
+      if (n.family === 'IPv4' && !n.internal) return n.address;
+    }
+  }
+  return null;
+}
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const USE_HTTPS = process.env.HTTPS === '1';
@@ -81,6 +93,10 @@ function handleRequest(req, res) {
     const id = crypto.randomBytes(6).toString('base64url');
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ session: id }));
+  }
+  if (url.startsWith('/api/whoami')) {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ lan: getLanHost(), port: PORT }));
   }
   // Everything else is a static asset
   serveFile(req, res);

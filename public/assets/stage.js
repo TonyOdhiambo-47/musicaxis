@@ -67,8 +67,22 @@ function connectWS() {
         setStatus("open", "phone disconnected");
       }
     } else if (m.type === "orient") {
+      // Defensive: if the presence message was lost, any incoming orient
+      // should still flip us to the viz and mark us paired.
+      if (!state.paired) {
+        state.paired = true;
+        dom.qrWrap.hidden = true;
+        dom.vizWrap.hidden = false;
+        setStatus("paired", "phone connected");
+      }
       onOrient(m);
     } else if (m.type === "tap") {
+      if (!state.paired) {
+        state.paired = true;
+        dom.qrWrap.hidden = true;
+        dom.vizWrap.hidden = false;
+        setStatus("paired", "phone connected");
+      }
       forceTrigger();
     }
   };
@@ -81,8 +95,17 @@ function connectWS() {
 
 function setStatus(s, txt) { dom.dot.dataset.state = s; dom.status.textContent = txt; }
 
-function renderQR() {
-  const url = `${location.protocol}//${location.host}/play?s=${sid}`;
+async function renderQR() {
+  // If we're at localhost, ask the server for a LAN-reachable hostname so
+  // the phone can actually hit this machine over Wi-Fi.
+  let host = location.host;
+  if (/^(localhost|127\.0\.0\.1|::1)/i.test(host)) {
+    try {
+      const r = await fetch("/api/whoami").then((x) => x.json());
+      if (r?.lan) host = `${r.lan}:${r.port || location.port || 3000}`;
+    } catch {}
+  }
+  const url = `${location.protocol}//${host}/play?s=${sid}`;
   dom.qrUrl.textContent = url;
   dom.qr.innerHTML = "";
   try {
@@ -135,7 +158,7 @@ async function startEngine() {
     dom.loader.hidden = true;
     dom.startWrap.hidden = true;
     dom.qrWrap.hidden = false;
-    try { renderQR(); } catch (e) { console.error(e); }
+    try { await renderQR(); } catch (e) { console.error(e); }
     connectWS();
   }
 }
