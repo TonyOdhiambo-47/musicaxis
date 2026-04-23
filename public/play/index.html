@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="/assets/play.css" />
 </head>
 <body>
+  <p id="fatal" class="hint" hidden style="margin:0;padding:12px 16px;background:#3a1712;color:#ffd7cf;border-bottom:1px solid #6a2b22;"></p>
   <section id="gate" class="screen">
     <h1>MusicAxis</h1>
     <p class="s">session <b id="sid">—</b></p>
@@ -19,6 +20,7 @@
   <section id="pad" class="screen pad" hidden>
     <div class="ring"><div class="dot" id="dot"></div></div>
     <p class="note" id="note">—</p>
+    <p id="event-log" class="hint mono" style="width:100%;max-width:28rem;min-height:3.6em;line-height:1.4;">events: waiting</p>
     <p class="hint">tap anywhere · hold + rotate to slide</p>
     <footer>
       <span id="sdot"></span>

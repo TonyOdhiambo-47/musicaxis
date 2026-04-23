@@ -211,7 +211,7 @@ wss.on('connection', (ws) => {
       orientFrames += 1;
       broadcast(s.stage, msg); return;
     }
-    if ((type === 'tap' || type === 'release' || type === 'strum' || type === 'ping-motion')
+    if ((type === 'down' || type === 'up' || type === 'tap' || type === 'release' || type === 'strum' || type === 'ping-motion')
         && ws._role === 'controller') {
       broadcast(s.stage, msg); return;
     }
