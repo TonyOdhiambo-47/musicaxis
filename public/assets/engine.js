@@ -85,39 +85,30 @@ export const instrumentFactory = {
   // Small download (~1.5 MB), quick load, real piano feel.
   async piano(onProgress, dest) {
     const base = "https://nbrosowsky.github.io/tonejs-instruments/samples/piano/";
+    // Keep the sample set tiny — Tone pitch-shifts everything in between.
     const urls = {
-      C2: "C2.mp3", A2: "A2.mp3",
-      C3: "C3.mp3", E3: "E3.mp3", A3: "A3.mp3",
-      C4: "C4.mp3", E4: "E4.mp3", A4: "A4.mp3",
-      C5: "C5.mp3", E5: "E5.mp3", A5: "A5.mp3",
-      C6: "C6.mp3", C7: "C7.mp3",
+      C3: "C3.mp3", C4: "C4.mp3", C5: "C5.mp3", C6: "C6.mp3",
     };
 
-    // Fake a progress bar while samples fetch in parallel — we can't easily
-    // read per-buffer progress, but timing-wise we're done in ~1-3s on wifi.
     let done = false;
     (async () => {
-      const total = 1800;
+      const total = 1200;
       const start = Date.now();
       while (!done) {
-        const t = Math.min(0.95, (Date.now() - start) / total);
-        onProgress?.(t);
-        await new Promise((r) => setTimeout(r, 80));
+        onProgress?.(Math.min(0.92, (Date.now() - start) / total));
+        await new Promise((r) => setTimeout(r, 60));
       }
     })();
 
-    const sampler = await new Promise((resolve, reject) => {
+    const sampler = await new Promise((resolve) => {
       const s = new Tone.Sampler({
-        urls,
-        baseUrl: base,
-        release: 1.2,
+        urls, baseUrl: base, release: 1.2,
         onload: () => resolve(s),
-        onerror: (e) => reject(e),
+        onerror: () => resolve(s),
       });
       s.volume.value = -4;
       s.connect(dest);
-      // Safety net: some browsers swallow onload on cached 304s.
-      setTimeout(() => resolve(s), 12000);
+      setTimeout(() => resolve(s), 5000); // bail fast — silence beats hang
     });
     done = true;
     onProgress?.(1);

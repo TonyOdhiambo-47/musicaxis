@@ -95,31 +95,37 @@ let master, instruments = {}, activeInst = null;
 async function startEngine() {
   if (state.engineReady) return;
   dom.startBtn.disabled = true;
-  await Tone.start();
-  Tone.Destination.volume.value = -4;
-  master = new MasterBus();
 
-  showLoader("tuning the piano", 0.05);
+  // Hard cap: whatever happens, hide the loader in 7 seconds.
+  const bail = setTimeout(() => { dom.loader.hidden = true; }, 7000);
+
   try {
+    await Tone.start();
+    Tone.Destination.volume.value = -4;
+    master = new MasterBus();
+
+    showLoader("tuning piano", 0.05);
     instruments.piano = await instrumentFactory.piano((p) => setFill(p * 0.7), master.input);
     setFill(0.75);
     dom.loaderTitle.textContent = "warming synths";
     instruments.synth = instrumentFactory.synth(master.input);
     instruments.strings = instrumentFactory.strings(master.input);
-    setFill(0.88);
+    setFill(0.9);
     dom.loaderTitle.textContent = "loading marimba";
     instruments.marimba = await instrumentFactory.marimba(master.input);
     setFill(1);
   } catch (err) {
-    console.error(err);
+    console.error("engine load error:", err);
+  } finally {
+    clearTimeout(bail);
+    activeInst = instruments[state.currentInst] || instruments.synth || null;
+    state.engineReady = true;
+    dom.loader.hidden = true;
+    dom.startWrap.hidden = true;
+    dom.qrWrap.hidden = false;
+    try { await renderQR(); } catch (e) { console.error(e); }
+    connectWS();
   }
-  activeInst = instruments[state.currentInst];
-  state.engineReady = true;
-  dom.loader.hidden = true;
-  dom.startWrap.hidden = true;
-  dom.qrWrap.hidden = false;
-  await renderQR();
-  connectWS();
 }
 function showLoader(title, p) { dom.loader.hidden = false; dom.loaderTitle.textContent = title; setFill(p); }
 function setFill(p) { dom.loaderFill.style.width = `${Math.round(Math.min(1, Math.max(0, p)) * 100)}%`; }
