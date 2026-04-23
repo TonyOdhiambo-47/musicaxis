@@ -9,40 +9,24 @@
   <link rel="stylesheet" href="/assets/play.css" />
 </head>
 <body>
-  <h1>MusicAxis</h1>
-
-  <section id="ios" hidden>
-    <p>iOS needs motion permission</p>
-    <button id="btn-enable">Enable motion</button>
+  <section id="gate" class="screen">
+    <h1>MusicAxis</h1>
+    <p class="s">session <b id="sid">—</b></p>
+    <button id="go">Start</button>
+    <p class="hint" id="gate-hint">tap once to enable motion + sound</p>
   </section>
 
-  <section id="connect" hidden>
-    <p>session <b id="sid">—</b></p>
-    <button id="btn-join">Connect</button>
+  <section id="pad" class="screen pad" hidden>
+    <div class="ring"><div class="dot" id="dot"></div></div>
+    <p class="note" id="note">—</p>
+    <p class="hint">tap anywhere · hold + rotate to slide</p>
+    <footer>
+      <span id="sdot"></span>
+      <span id="stext">idle</span>
+      <span class="sp"></span>
+      <span class="mono" id="ro">α — · β — · γ —</span>
+    </footer>
   </section>
-
-  <section id="live" hidden>
-    <div id="dot"></div>
-    <p class="hints">
-      tilt L/R · pitch<br>
-      tilt forward · louder<br>
-      rotate · reverb
-    </p>
-    <button id="btn-tap">Tap note</button>
-  </section>
-
-  <section id="err" hidden>
-    <p>open the stage on a laptop and scan the QR with your phone.</p>
-  </section>
-
-  <footer>
-    <span id="sdot"></span>
-    <span id="stext">idle</span>
-  </footer>
-
-  <div class="readout" id="ro" hidden>
-    α <b id="ra">—</b> · β <b id="rb">—</b> · γ <b id="rg">—</b>
-  </div>
 
   <script src="/assets/play.js"></script>
 </body>

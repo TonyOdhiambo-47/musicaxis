@@ -4,11 +4,11 @@
   --dim: #9a8f7c;
   --line: #2a241d;
   --accent: #e8a04f;
-  --rec: #d94a2e;
   --ok: #9bd39a;
+  --rec: #d94a2e;
 }
 
-* { box-sizing: border-box; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 [hidden] { display: none !important; }
 html, body {
   margin: 0;
@@ -17,101 +17,100 @@ html, body {
   font-family: ui-sans-serif, -apple-system, system-ui, sans-serif;
   min-height: 100dvh;
   overflow: hidden;
+  overscroll-behavior: none;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
 }
-body {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
-  text-align: center;
-  gap: 20px;
-}
 
-h1 {
-  font-size: 32px;
-  font-weight: 500;
-  margin: 0;
-  letter-spacing: -0.02em;
-}
-
-section {
-  flex: 1;
+.screen {
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  width: 100%;
+  gap: 20px;
+  padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
+  text-align: center;
 }
 
-section p { color: var(--dim); font-size: 15px; margin: 0; }
-section p b { color: var(--accent); font-family: ui-monospace, monospace; }
+h1 {
+  font-size: 36px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+.s { color: var(--dim); font-size: 14px; margin: 0; }
+.s b { color: var(--accent); font-family: ui-monospace, monospace; }
 
-button {
+#go {
+  width: 220px; height: 220px;
   background: transparent;
   border: 1px solid var(--accent);
   color: var(--fg);
-  padding: 16px 32px;
-  border-radius: 999px;
-  font-size: 17px;
+  font-size: 20px;
+  border-radius: 50%;
   cursor: pointer;
-  transition: background 160ms;
+  transition: background 140ms, transform 120ms;
 }
-button:active { background: rgba(232,160,79,0.15); }
+#go:active { background: rgba(232,160,79,0.18); transform: scale(0.97); }
+.hint { color: var(--dim); font-size: 13px; margin: 0; }
 
-#btn-enable, #btn-join {
-  width: 200px; height: 200px;
-  border-radius: 50%;
-  padding: 0;
-  font-size: 18px;
+/* the pad is the whole screen — tappable anywhere */
+.pad {
+  justify-content: space-between;
+  position: relative;
 }
-
-#live { gap: 28px; }
-#dot {
-  width: 140px; height: 140px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(232,160,79,0.45), rgba(232,160,79,0.05) 70%, transparent);
-  border: 1px solid var(--accent);
-  transition: transform 80ms linear;
-}
-.hints {
-  font-size: 14px;
-  line-height: 1.7;
-  color: var(--dim);
-}
-
-#btn-tap {
+.pad .ring {
+  width: min(60vw, 280px);
+  aspect-ratio: 1;
   border: 1px solid var(--line);
-  font-size: 14px;
-  padding: 10px 20px;
+  border-radius: 50%;
+  position: relative;
+  display: grid; place-items: center;
+  margin: auto;
+  background: radial-gradient(circle, rgba(232,160,79,0.08), transparent 70%);
+  transition: box-shadow 120ms, border-color 120ms;
 }
+.pad .dot {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 24px rgba(232,160,79,0.55);
+  transition: transform 70ms linear;
+}
+.pad.down .ring {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 8px rgba(232,160,79,0.1), inset 0 0 40px rgba(232,160,79,0.14);
+}
+.pad.down .dot {
+  box-shadow: 0 0 36px var(--accent);
+  background: var(--fg);
+}
+
+.note {
+  font-size: 52px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+  color: var(--fg);
+  letter-spacing: -0.03em;
+}
+.pad.down .note { color: var(--accent); }
 
 footer {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--dim);
-  padding-top: 8px;
+  padding-top: 10px;
   border-top: 1px solid var(--line);
   width: 100%;
-  justify-content: center;
 }
+.sp { flex: 1; }
 #sdot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); }
 #sdot[data-state="ready"] { background: var(--accent); }
 #sdot[data-state="live"]  { background: var(--ok); }
 #sdot[data-state="error"] { background: var(--rec); }
-
-.readout {
-  position: fixed;
-  bottom: 4px; left: 0; right: 0;
-  text-align: center;
-  font-family: ui-monospace, monospace;
-  font-size: 11px;
-  color: var(--dim);
-  pointer-events: none;
-}
-.readout b { color: var(--fg); font-variant-numeric: tabular-nums; }
+.mono { font-family: ui-monospace, monospace; }
+.mono b { color: var(--fg); font-weight: 500; }

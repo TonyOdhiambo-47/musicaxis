@@ -28,11 +28,10 @@ const state = {
   currentInst: "piano",
   scale: "minor_pentatonic",
   orient: { alpha: 0, beta: 0, gamma: 0 },
-  zoneIdx: -1,
+  holding: false,
   engineReady: false,
   paired: false,
   lastTriggerAt: 0,
-  lastReleaseTimer: null,
   inboundFrames: 0,
   lastInboundSecondAt: performance.now(),
   secondFrameCount: 0,
@@ -62,12 +61,17 @@ function connectWS() {
   ws.onmessage = (e) => {
     countInbound();
     let m; try { m = JSON.parse(e.data); } catch { return; }
-    if (m.type === "presence") {
-      if (m.status === "controller-connected" || (m.status === "paired" && m.peers > 0)) {
+    const flipToViz = () => {
+      if (!state.paired) {
         state.paired = true;
         dom.qrWrap.hidden = true;
         dom.vizWrap.hidden = false;
         setStatus("paired", "phone connected");
+      }
+    };
+    if (m.type === "presence") {
+      if (m.status === "controller-connected" || (m.status === "paired" && m.peers > 0)) {
+        flipToViz();
       } else if (m.status === "controller-disconnected") {
         state.paired = false;
         dom.qrWrap.hidden = false;
@@ -75,23 +79,22 @@ function connectWS() {
         setStatus("open", "phone disconnected");
       }
     } else if (m.type === "orient") {
-      // Defensive: if the presence message was lost, any incoming orient
-      // should still flip us to the viz and mark us paired.
-      if (!state.paired) {
-        state.paired = true;
-        dom.qrWrap.hidden = true;
-        dom.vizWrap.hidden = false;
-        setStatus("paired", "phone connected");
-      }
+      flipToViz();
       onOrient(m);
+    } else if (m.type === "down") {
+      flipToViz();
+      // Latest orientation rides along on the down msg.
+      state.orient.alpha = clampAlpha(m.alpha);
+      state.orient.beta = m.beta || 0;
+      state.orient.gamma = m.gamma || 0;
+      updateViz();
+      holdStart();
+    } else if (m.type === "up") {
+      holdEnd();
     } else if (m.type === "tap") {
-      if (!state.paired) {
-        state.paired = true;
-        dom.qrWrap.hidden = true;
-        dom.vizWrap.hidden = false;
-        setStatus("paired", "phone connected");
-      }
-      forceTrigger();
+      flipToViz();
+      holdStart();
+      setTimeout(holdEnd, 320);
     }
   };
   ws.onclose = () => {
@@ -212,41 +215,20 @@ dom.insts.forEach((b) => b.addEventListener("click", () => {
 dom.scales.forEach((b) => b.addEventListener("click", () => {
   dom.scales.forEach((x) => x.classList.toggle("active", x === b));
   state.scale = b.dataset.scale;
-  state.zoneIdx = -1;
 }));
 
-// orientation → note
-const HYST = 2.5;
-const AUTO_RELEASE = 800;
+// ─── Orientation / note mapping ─────────────────────────────────
+// γ (-60..60) picks the scale index · β opens the master filter
+// · α swells reverb. Notes fire on phone TAP (down/up); while held,
+// rotating slides through zones seamlessly.
+function clampAlpha(a) { if (a == null || Number.isNaN(a)) return 0; return ((a % 360) + 360) % 360; }
+
 function onOrient(msg) {
-  state.orient.alpha = ((msg.alpha || 0) % 360 + 360) % 360;
+  state.orient.alpha = clampAlpha(msg.alpha);
   state.orient.beta = msg.beta || 0;
   state.orient.gamma = msg.gamma || 0;
-
-  // viz: move the dot around the ring based on gamma + beta
-  const x = Math.max(-1, Math.min(1, state.orient.gamma / 60)) * 70;
-  const y = -Math.max(-1, Math.min(1, state.orient.beta / 60)) * 70;
-  dom.vizDot.style.transform = `translate(${x}px, ${y}px)`;
-  dom.values.textContent = `α ${Math.round(state.orient.alpha)} · β ${Math.round(state.orient.beta)} · γ ${Math.round(state.orient.gamma)}`;
-
-  if (!activeInst) return;
-  const scale = SCALES[state.scale];
-  const n = scale.length;
-  const raw = (state.orient.gamma + 60) / 120;
-  const targetIdx = Math.max(0, Math.min(n - 1, Math.floor(raw * n)));
-
-  if (state.zoneIdx === -1) {
-    state.zoneIdx = targetIdx;
-    trigger(scale[targetIdx]);
-  } else if (targetIdx !== state.zoneIdx) {
-    const zw = 120 / n;
-    const centre = (state.zoneIdx + 0.5) * zw - 60;
-    if (Math.abs(state.orient.gamma - centre) > zw / 2 + HYST) {
-      state.zoneIdx = targetIdx;
-      trigger(scale[targetIdx]);
-    }
-  }
-
+  updateViz();
+  if (state.holding) slideToCurrentZone();
   if (master) {
     const wet = Math.min(0.5, Math.abs(state.orient.alpha - 180) / 180 * 0.5);
     master.setReverb(wet);
@@ -255,29 +237,60 @@ function onOrient(msg) {
   }
 }
 
-function velocity(beta) {
-  const b = Math.max(-90, Math.min(60, beta));
-  return 0.35 + ((b + 90) / 150) * 0.65;
+function updateViz() {
+  const x = Math.max(-1, Math.min(1, state.orient.gamma / 60)) * 70;
+  const y = -Math.max(-1, Math.min(1, state.orient.beta / 60)) * 70;
+  dom.vizDot.style.transform = `translate(${x}px, ${y}px)`;
+  dom.values.textContent = `α ${Math.round(state.orient.alpha)} · β ${Math.round(state.orient.beta)} · γ ${Math.round(state.orient.gamma)}`;
 }
 
-let lastNote = null;
-function trigger(note) {
-  if (!activeInst || !note) return;
-  const now = performance.now();
-  if (now - state.lastTriggerAt < 40) return;
-  state.lastTriggerAt = now;
+function currentZoneNote() {
+  const scale = SCALES[state.scale];
+  const raw = (state.orient.gamma + 60) / 120;
+  const idx = Math.max(0, Math.min(scale.length - 1, Math.floor(raw * scale.length)));
+  return scale[idx];
+}
+
+function velocity(beta) {
+  const b = Math.max(-90, Math.min(60, beta));
+  return 0.4 + ((b + 90) / 150) * 0.6;
+}
+
+let heldNote = null;
+function holdStart() {
+  if (!activeInst) return;
+  const note = currentZoneNote();
   try {
-    if (lastNote) activeInst.triggerRelease?.(lastNote);
+    if (heldNote) activeInst.triggerRelease?.(heldNote);
     activeInst.triggerAttack(note, undefined, velocity(state.orient.beta));
-    lastNote = note;
+    heldNote = note;
+    state.holding = true;
     state.lastNote = note;
     dom.note.textContent = note;
     renderDebug();
-    if (state.lastReleaseTimer) clearTimeout(state.lastReleaseTimer);
-    state.lastReleaseTimer = setTimeout(() => { try { activeInst.triggerRelease(note); } catch {}; if (lastNote === note) lastNote = null; }, AUTO_RELEASE);
+  } catch (e) { console.error("trigger failed", e); }
+}
+function holdEnd() {
+  state.holding = false;
+  if (heldNote && activeInst) { try { activeInst.triggerRelease(heldNote); } catch {} }
+  heldNote = null;
+}
+function slideToCurrentZone() {
+  if (!activeInst || !state.holding) return;
+  const note = currentZoneNote();
+  if (note === heldNote) return;
+  const now = performance.now();
+  if (now - state.lastTriggerAt < 35) return;
+  state.lastTriggerAt = now;
+  try {
+    if (heldNote) activeInst.triggerRelease?.(heldNote);
+    activeInst.triggerAttack(note, undefined, velocity(state.orient.beta));
+    heldNote = note;
+    state.lastNote = note;
+    dom.note.textContent = note;
+    renderDebug();
   } catch {}
 }
-function forceTrigger() { if (state.zoneIdx >= 0) trigger(SCALES[state.scale][state.zoneIdx]); }
 
 // recording
 let rec, chunks = [], recStart = 0, recTimer = null;
