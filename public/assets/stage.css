@@ -91,8 +91,12 @@ main {
   padding: 12px;
   border-radius: 4px;
   line-height: 0;
+  min-width: 224px;
+  min-height: 224px;
+  display: grid;
+  place-items: center;
 }
-#qr canvas { display: block; }
+#qr img, #qr canvas { display: block; width: 200px; height: 200px; }
 .url {
   font-family: ui-monospace, monospace;
   font-size: 12px;

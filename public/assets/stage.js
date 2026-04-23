@@ -85,9 +85,20 @@ async function renderQR() {
   const url = `${location.protocol}//${location.host}/play?s=${sid}`;
   dom.qrUrl.textContent = url;
   dom.qr.innerHTML = "";
-  const c = document.createElement("canvas");
-  dom.qr.appendChild(c);
-  await QRCode.toCanvas(c, url, { errorCorrectionLevel: "M", margin: 1, width: 180, color: { dark: "#0b0a08", light: "#f1e7d0" } });
+  try {
+    const dataUrl = await QRCode.toDataURL(url, {
+      errorCorrectionLevel: "M", margin: 1, width: 220,
+      color: { dark: "#0b0a08ff", light: "#f1e7d0ff" },
+    });
+    const img = new Image();
+    img.src = dataUrl;
+    img.width = 200; img.height = 200;
+    img.alt = "scan to join";
+    dom.qr.appendChild(img);
+  } catch (err) {
+    console.error("QR render failed:", err);
+    dom.qr.textContent = "(QR failed — use the URL)";
+  }
 }
 
 // audio
