@@ -39,8 +39,9 @@
       listenersAttached: false,
       wsConnecting: false,
       recentEvents: [],
-      alpha0: null,      // calibrated "center" — so rotating L/R works in any orientation
-      rotRange: 90,      // ±90° of α-delta → full scale width
+      alpha0: null,
+      gamma0: null,      // calibrated centre (γ at the moment of Start)
+      rotRange: 55,      // ±55° of γ-delta → full scale width (racing-game feel)
     };
     const HZ = 30;
     const INT = 1000 / HZ;
@@ -176,16 +177,17 @@
     }
 
     function calibrate() {
+      state.gamma0 = state.gamma;
       state.alpha0 = state.alpha;
       dom.note.textContent = "center set";
       setTimeout(() => { dom.note.textContent = state.latestNote; }, 700);
     }
-    // Turn the current α into a pseudo-γ that says how far the user has
-    // rotated from the moment they tapped Start. Works identically in
-    // portrait and landscape — whole ±90° of easy wrist travel.
+    // Racing-game tilt: γ (roll around long axis) with a calibrated centre.
+    // Wherever you're holding the phone when you tap Start = 0°. Tilt the
+    // "wheel" left/right from there. Works portrait and landscape identical.
     function effectiveGamma() {
-      if (state.alpha0 == null) state.alpha0 = state.alpha;
-      const delta = ((state.alpha - state.alpha0 + 540) % 360) - 180;
+      if (state.gamma0 == null) state.gamma0 = state.gamma;
+      const delta = state.gamma - state.gamma0;
       return Math.max(-state.rotRange, Math.min(state.rotRange, delta));
     }
 
@@ -195,6 +197,7 @@
         state.alpha = e.alpha || 0;
         state.beta = e.beta || 0;
         state.gamma = e.gamma || 0;
+        if (state.gamma0 == null) state.gamma0 = state.gamma;
         if (state.alpha0 == null) state.alpha0 = state.alpha;
         paint();
         const now = performance.now();

@@ -12,6 +12,7 @@ const dom = {
   stripCells: $("strip-cells"),
   stripCurrent: $("strip-current"),
   stripTarget: $("strip-target"),
+  stripNext: $("strip-next"),
   octLine: $("oct-line"),
   note: $("note"),
   values: $("values"),
@@ -285,19 +286,20 @@ function songStop() {
   previewKey = "";
   pushPreview();
 }
-function songCurrentTarget() {
+function songTargetAt(stepIdx) {
   if (!song.active) return null;
-  const step = song.active.steps[song.stepIdx];
+  const step = song.active.steps[stepIdx];
   if (!step) return null;
   const [idx, octShift] = step;
   const pitch = SCALES[song.active.scale][idx];
   const octave = BASE_OCTAVE + octShift;
-  // The exact γ angle that picks this scale index (zone centre)
   const scale = SCALES[song.active.scale];
   const zw = (2 * GAMMA_RANGE) / scale.length;
   const gamma = (idx + 0.5) * zw - GAMMA_RANGE;
   return { idx, pitch, octave, note: `${pitch}${octave}`, gamma: Math.round(gamma) };
 }
+function songCurrentTarget() { return song.active ? songTargetAt(song.stepIdx) : null; }
+function songNextTarget()    { return song.active ? songTargetAt(song.stepIdx + 1) : null; }
 // ─── Paste-your-own-tab parser ────────────────────────────────────────
 // Accepts "C4 D#4 E4 G4", "C4,D#4,E4", "C D# E G" (defaults to octave 4),
 // or a newline-separated list. Everything that doesn't match a note is ignored.
@@ -364,7 +366,8 @@ function songAdvanceIfMatched() {
   const tgt = songCurrentTarget();
   if (!tgt) return;
   const got = currentZoneInfo();
-  if (got.idx === tgt.idx && got.octave === tgt.octave) {
+  const inRadius = Math.abs(got.idx - tgt.idx) <= SNAP_RADIUS && Math.abs(got.octave - tgt.octave) <= 1;
+  if (inRadius) {
     song.stepIdx = Math.min(song.stepIdx + 1, song.active.steps.length);
     songStep.textContent = song.stepIdx;
     if (song.stepIdx >= song.active.steps.length) {
@@ -425,18 +428,33 @@ function updateViz() {
 
 function updateTargetHint() {
   const tgt = songCurrentTarget?.();
+  const nxt = songNextTarget?.();
   if (!tgt || !dom.stripTarget) {
     if (dom.stripTarget) dom.stripTarget.hidden = true;
+    if (dom.stripNext) dom.stripNext.hidden = true;
     if (dom.octLine) dom.octLine.textContent = `oct ${currentZoneInfo().octave}`;
     return;
   }
   const tgtPct = ((tgt.gamma + GAMMA_RANGE) / (2 * GAMMA_RANGE)) * 100;
   dom.stripTarget.hidden = false;
   dom.stripTarget.style.left = `${tgtPct.toFixed(2)}%`;
+
+  // Blue "next" dot — offset vertically so it's readable next to the red one.
+  if (dom.stripNext) {
+    if (nxt) {
+      const nxtPct = ((nxt.gamma + GAMMA_RANGE) / (2 * GAMMA_RANGE)) * 100;
+      dom.stripNext.hidden = false;
+      dom.stripNext.style.left = `${nxtPct.toFixed(2)}%`;
+    } else {
+      dom.stripNext.hidden = true;
+    }
+  }
+
   const cur = currentZoneInfo();
   const arrow = tgt.octave > cur.octave ? "↑" : tgt.octave < cur.octave ? "↓" : "·";
+  const nextBit = nxt ? ` &nbsp;·&nbsp; <span style="color:#5ab9ff">next ${nxt.note}</span>` : "";
   if (dom.octLine) {
-    dom.octLine.innerHTML = `oct ${cur.octave} &nbsp;→&nbsp; <span class="tgt">${tgt.note} ${arrow} (γ ${tgt.gamma}°)</span>`;
+    dom.octLine.innerHTML = `oct ${cur.octave} &nbsp;→&nbsp; <span class="tgt">${tgt.note} ${arrow} (γ ${tgt.gamma}°)</span>${nextBit}`;
   }
 }
 
