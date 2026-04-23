@@ -9,36 +9,20 @@ const Tone = window.Tone;
 // Ordered low → high. Each scale is tuned for the "Despacito intuitive"
 // feel: every note is in key, so sweeping gamma across the phone plays
 // a melody that sounds right even when it's wrong.
-// Wide scales for actual song-playing. Each spans ~3 octaves so the phone's
-// tilt range translates into enough pitches to carry a melody.
+// Each scale is a list of PITCH CLASSES (no octave number). The stage adds
+// the octave based on β — so γ (left/right tilt) picks the pitch class and
+// β (forward tilt) picks the octave. Far fewer, bigger zones; easier to aim.
 export const SCALES = {
-  // A minor pentatonic — 3 octaves (Dance Monkey, Snowman, a thousand pop hooks)
-  minor_pentatonic: [
-    "A2","C3","D3","E3","G3",
-    "A3","C4","D4","E4","G4",
-    "A4","C5","D5","E5","G5",
-    "A5","C6","D6","E6","G6",
-  ],
-  // C major pentatonic — sunshine, nursery-rhyme melodies
-  major_pentatonic: [
-    "C3","D3","E3","G3","A3",
-    "C4","D4","E4","G4","A4",
-    "C5","D5","E5","G5","A5",
-    "C6","D6","E6","G6","A6",
-  ],
-  // A blues — adds the flat five
-  blues: [
-    "A2","C3","D3","D#3","E3","G3",
-    "A3","C4","D4","D#4","E4","G4",
-    "A4","C5","D5","D#5","E5","G5",
-    "A5","C6","D6","D#6","E6","G6",
-  ],
-  // Full chromatic over 2 octaves — every semitone, for precise song work
-  chromatic: [
-    "C3","C#3","D3","D#3","E3","F3","F#3","G3","G#3","A3","A#3","B3",
-    "C4","C#4","D4","D#4","E4","F4","F#4","G4","G#4","A4","A#4","B4",
-    "C5","C#5","D5","D#5","E5","F5","F#5","G5","G#5","A5","A#5","B5",
-  ],
+  // A minor pentatonic — 5 notes (Dance Monkey, Snowman)
+  minor_pentatonic: ["A", "C", "D", "E", "G"],
+  // C major pentatonic — 5 sunny notes
+  major_pentatonic: ["C", "D", "E", "G", "A"],
+  // C major — 7 diatonic white keys
+  major: ["C", "D", "E", "F", "G", "A", "B"],
+  // A blues — 6 notes with the flat five swagger
+  blues: ["A", "C", "D", "D#", "E", "G"],
+  // Chromatic — every semitone
+  chromatic: ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"],
 };
 
 // ── Master bus ────────────────────────────────────────────────────────

@@ -22,8 +22,8 @@
     const dom = {
       gate: $("gate"), pad: $("pad"), sid: $("sid"), go: $("go"),
       gateHint: $("gate-hint"), fatal: $("fatal"),
-      dot: $("dot"), note: $("note"), ro: $("ro"),
-      sdot: $("sdot"), stext: $("stext"), eventLog: $("event-log"),
+      note: $("note"), oct: $("oct"), strip: $("strip"), ro: $("ro"),
+      sdot: $("sdot"), stext: $("stext"),
     };
 
     const sid = (new URLSearchParams(location.search).get("s") || "").replace(/[^A-Za-z0-9_-]/g, "");
@@ -46,11 +46,7 @@
     let wsReady = false;
     let ws = null;
 
-    function addEventLine(text) {
-      state.recentEvents.unshift(text);
-      state.recentEvents = state.recentEvents.slice(0, 3);
-      if (dom.eventLog) dom.eventLog.innerHTML = state.recentEvents.join("<br>");
-    }
+    function addEventLine() { /* event log removed — keeping stub in case of legacy calls */ }
 
     function setStatus(s, t) {
       dom.sdot.dataset.state = s;
@@ -58,12 +54,25 @@
     }
 
     function paint() {
-      const ringSize = Math.min(280, window.innerWidth * 0.6);
-      const r = ringSize * 0.35;
-      const x = Math.max(-1, Math.min(1, state.gamma / 60)) * r;
-      const y = -Math.max(-1, Math.min(1, state.beta / 60)) * r;
-      dom.dot.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
       dom.ro.innerHTML = `α <b>${Math.round(state.alpha)}</b> · β <b>${Math.round(state.beta)}</b> · γ <b>${Math.round(state.gamma)}</b>`;
+    }
+
+    function renderStrip(scale, activeIdx) {
+      if (!dom.strip) return;
+      const current = dom.strip.dataset.scale || "";
+      const key = scale.join(",");
+      if (current !== key) {
+        dom.strip.innerHTML = "";
+        for (let i = 0; i < scale.length; i++) {
+          const cell = document.createElement("div");
+          cell.className = "cell";
+          cell.textContent = scale[i];
+          dom.strip.appendChild(cell);
+        }
+        dom.strip.dataset.scale = key;
+      }
+      const cells = dom.strip.children;
+      for (let i = 0; i < cells.length; i++) cells[i].classList.toggle("active", i === activeIdx);
     }
 
     function send(msg) {
@@ -139,13 +148,12 @@
       ws.onmessage = (e) => {
         try {
           const m = JSON.parse(e.data);
-          if (m.type === "presence" && m.status === "paired") {
-            setStatus("live", "paired");
-            addEventLine("paired with desktop");
-          }
+          if (m.type === "presence" && m.status === "paired") setStatus("live", "paired");
           if (m.type === "note") {
             state.latestNote = m.note;
             dom.note.textContent = m.note;
+            if (dom.oct) dom.oct.textContent = `oct ${m.octave ?? ""}`.trim();
+            if (Array.isArray(m.scale)) renderStrip(m.scale, m.idx ?? -1);
           }
         } catch {}
       };

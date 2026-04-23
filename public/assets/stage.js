@@ -215,6 +215,8 @@ dom.insts.forEach((b) => b.addEventListener("click", () => {
 dom.scales.forEach((b) => b.addEventListener("click", () => {
   dom.scales.forEach((x) => x.classList.toggle("active", x === b));
   state.scale = b.dataset.scale;
+  previewKey = "";
+  pushPreview();
 }));
 
 // ─── Orientation / note mapping ─────────────────────────────────
@@ -245,24 +247,48 @@ function updateViz() {
   dom.values.textContent = `α ${Math.round(state.orient.alpha)} · β ${Math.round(state.orient.beta)} · γ ${Math.round(state.orient.gamma)}`;
 }
 
-// γ ∈ [-80, 80] → 0..scale.length-1. Using β (pitch) too would feel
-// confusing, so one axis does the melody and β only brightens the tone.
-function currentZoneNote() {
-  const scale = SCALES[state.scale];
-  const g = Math.max(-80, Math.min(80, state.orient.gamma));
-  const raw = (g + 80) / 160;
-  const idx = Math.max(0, Math.min(scale.length - 1, Math.floor(raw * scale.length)));
-  return scale[idx];
-}
+// ── Clear convention ────────────────────────────────────────────────
+//   γ (left/right tilt, ±60°) → picks ONE pitch class from the scale
+//   β (forward/back tilt)     → picks OCTAVE: back=−1, flat=0, forward=+1
+// So e.g. for A minor pentatonic (5 notes), each γ zone is 24° wide.
+// For chromatic (12 notes), each zone is 10° wide.
+const GAMMA_RANGE = 60;                // ±60 degrees = full scale
+const BETA_UP = 25;                    // β > 25° → octave up
+const BETA_DOWN = -25;                 // β < -25° → octave down
+const BASE_OCTAVE = 4;                 // middle of the range
 
-// Tell the phone what note it would play right now — so the user can aim.
-let previewNote = null;
+function currentZoneInfo() {
+  const scale = SCALES[state.scale];
+  const n = scale.length;
+  const g = Math.max(-GAMMA_RANGE, Math.min(GAMMA_RANGE, state.orient.gamma));
+  const idx = Math.max(0, Math.min(n - 1, Math.floor(((g + GAMMA_RANGE) / (2 * GAMMA_RANGE)) * n)));
+  const b = state.orient.beta;
+  const octShift = b > BETA_UP ? 1 : b < BETA_DOWN ? -1 : 0;
+  const pitch = scale[idx];
+  const octave = BASE_OCTAVE + octShift;
+  return { idx, pitch, octave, note: `${pitch}${octave}` };
+}
+function currentZoneNote() { return currentZoneInfo().note; }
+
+// Push the preview note + zone index + scale layout to the phone so it
+// can show a scale strip with the current note highlighted.
+let previewKey = "";
 function pushPreview() {
   if (!state.paired || !ws || ws.readyState !== WebSocket.OPEN) return;
-  const note = currentZoneNote();
-  if (note === previewNote) return;
-  previewNote = note;
-  try { ws.send(JSON.stringify({ type: "note", note })); } catch {}
+  const z = currentZoneInfo();
+  const key = `${z.note}|${z.idx}|${state.scale}`;
+  if (key === previewKey) return;
+  previewKey = key;
+  try {
+    ws.send(JSON.stringify({
+      type: "note",
+      note: z.note,
+      idx: z.idx,
+      octave: z.octave,
+      scale: SCALES[state.scale],
+      scaleName: state.scale,
+    }));
+  } catch {}
 }
 
 function velocity(beta) {
