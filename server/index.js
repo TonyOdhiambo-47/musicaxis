@@ -76,7 +76,9 @@ function serveFile(req, res) {
       const ext = path.extname(target).toLowerCase();
       res.writeHead(200, {
         'Content-Type': MIME[ext] || 'application/octet-stream',
-        'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=300',
+        // Disable caching during active development — stale JS on phones has
+        // bitten us twice now.
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
       });
       res.end(data);
     });
