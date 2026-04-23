@@ -28,6 +28,7 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 const USE_HTTPS = process.env.HTTPS === '1';
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 const SESSION_TTL_MS = 30 * 60 * 1000;
+let orientFrames = 0;
 
 // ── Static file server ──────────────────────────────────────────────
 const MIME = {
@@ -98,6 +99,16 @@ function handleRequest(req, res) {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ lan: getLanHost(), port: PORT }));
   }
+  if (url === '/api/debug') {
+    let controllers = 0;
+    let stages = 0;
+    for (const s of sessions.values()) {
+      controllers += s.controller.size;
+      stages += s.stage.size;
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ sessions: sessions.size, controllers, stages, orientFrames }));
+  }
   // Everything else is a static asset
   serveFile(req, res);
 }
@@ -164,6 +175,7 @@ wss.on('connection', (ws) => {
         ? msg.session.replace(/[^A-Za-z0-9_-]/g, '')
         : null;
       if (!role || !sid) { ws.close(1008, 'bad join'); return; }
+      console.log(`[musicaxis] join role=${role} session=${sid}`);
       ws._role = role;
       ws._session = sid;
       const s = getSession(sid);
@@ -194,6 +206,7 @@ wss.on('connection', (ws) => {
 
     // Controller → stage
     if (type === 'orient' && ws._role === 'controller') {
+      orientFrames += 1;
       broadcast(s.stage, msg); return;
     }
     if ((type === 'tap' || type === 'release' || type === 'strum' || type === 'ping-motion')

@@ -28,9 +28,10 @@
     } catch (e) { setStatus("error", e.message); }
   }, { once: true });
 
-  dom.btnJoin?.addEventListener("click", () => {
+  dom.btnJoin?.addEventListener("click", async () => {
     dom.connect.hidden = true; dom.live.hidden = false; dom.ro.hidden = false;
     setStatus("idle", "connecting…");
+    await primeMotion();
     connectWS();
     attachOrient();
   }, { once: true });
@@ -47,7 +48,17 @@
 
   const HZ = 30, INT = 1000 / HZ;
   let last = 0, latest = { alpha: 0, beta: 0, gamma: 0 };
+  let orientAttached = false;
+  let sensor = null;
+  async function primeMotion() {
+    if (typeof DeviceOrientationEvent?.requestPermission === "function") return;
+    if (typeof DeviceMotionEvent?.requestPermission === "function") {
+      try { await DeviceMotionEvent.requestPermission(); } catch {}
+    }
+  }
   function attachOrient() {
+    if (orientAttached) return;
+    orientAttached = true;
     const h = (e) => {
       if (e.alpha == null && e.beta == null && e.gamma == null) return;
       latest.alpha = e.alpha || 0; latest.beta = e.beta || 0; latest.gamma = e.gamma || 0;
@@ -58,6 +69,31 @@
     };
     window.addEventListener("deviceorientation", h);
     window.addEventListener("deviceorientationabsolute", h);
+    if ("AbsoluteOrientationSensor" in window) {
+      try {
+        sensor = new window.AbsoluteOrientationSensor({ frequency: HZ, referenceFrame: "device" });
+        sensor.addEventListener("reading", () => {
+          if (!sensor.quaternion) return;
+          const [x, y, z, w] = sensor.quaternion;
+          const ysqr = y * y;
+          const t0 = 2 * (w * x + y * z);
+          const t1 = 1 - 2 * (x * x + ysqr);
+          const roll = Math.atan2(t0, t1);
+          let t2 = 2 * (w * y - z * x);
+          t2 = Math.max(-1, Math.min(1, t2));
+          const pitch = Math.asin(t2);
+          const t3 = 2 * (w * z + x * y);
+          const t4 = 1 - 2 * (ysqr + z * z);
+          const yaw = Math.atan2(t3, t4);
+          h({
+            alpha: yaw * (180 / Math.PI),
+            beta: pitch * (180 / Math.PI),
+            gamma: roll * (180 / Math.PI),
+          });
+        });
+        sensor.start();
+      } catch {}
+    }
   }
   function send() {
     if (!ws || ws.readyState !== WebSocket.OPEN) return;

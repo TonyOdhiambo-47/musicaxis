@@ -13,6 +13,7 @@ const dom = {
   values: $("values"),
   dot: $("dot"),
   status: $("status"),
+  debugLine: $("debug-line"),
   insts: document.querySelectorAll("[data-inst]"),
   scales: document.querySelectorAll("[data-scale]"),
   recBtn: $("rec-btn"),
@@ -32,6 +33,11 @@ const state = {
   paired: false,
   lastTriggerAt: 0,
   lastReleaseTimer: null,
+  inboundFrames: 0,
+  lastInboundSecondAt: performance.now(),
+  secondFrameCount: 0,
+  wsRxPerSecond: 0,
+  lastNote: "—",
 };
 
 // session
@@ -50,9 +56,11 @@ function connectWS() {
   ws = new WebSocket(`${proto}//${location.host}/ws`);
   ws.onopen = () => {
     setStatus("open", "waiting for phone");
+    renderDebug();
     ws.send(JSON.stringify({ type: "join", role: "stage", session: sid }));
   };
   ws.onmessage = (e) => {
+    countInbound();
     let m; try { m = JSON.parse(e.data); } catch { return; }
     if (m.type === "presence") {
       if (m.status === "controller-connected" || (m.status === "paired" && m.peers > 0)) {
@@ -88,12 +96,30 @@ function connectWS() {
   };
   ws.onclose = () => {
     setStatus("error", "disconnected, retrying…");
+    renderDebug();
     setTimeout(connectWS, 1500);
   };
   ws.onerror = () => {};
 }
 
 function setStatus(s, txt) { dom.dot.dataset.state = s; dom.status.textContent = txt; }
+function countInbound() {
+  state.inboundFrames += 1;
+  state.secondFrameCount += 1;
+  const now = performance.now();
+  const elapsed = now - state.lastInboundSecondAt;
+  if (elapsed >= 1000) {
+    state.wsRxPerSecond = state.secondFrameCount / (elapsed / 1000);
+    state.secondFrameCount = 0;
+    state.lastInboundSecondAt = now;
+  }
+  renderDebug();
+}
+function renderDebug() {
+  if (!dom.debugLine) return;
+  const wsState = !ws ? "closed" : ws.readyState === WebSocket.OPEN ? "open" : "closed";
+  dom.debugLine.textContent = `ws=${wsState} inbound=${state.inboundFrames} frames ws-rx/s=${state.wsRxPerSecond.toFixed(1)} last-note=${state.lastNote}`;
+}
 
 async function renderQR() {
   // If we're at localhost, ask the server for a LAN-reachable hostname so
@@ -244,7 +270,9 @@ function trigger(note) {
     if (lastNote) activeInst.triggerRelease?.(lastNote);
     activeInst.triggerAttack(note, undefined, velocity(state.orient.beta));
     lastNote = note;
+    state.lastNote = note;
     dom.note.textContent = note;
+    renderDebug();
     if (state.lastReleaseTimer) clearTimeout(state.lastReleaseTimer);
     state.lastReleaseTimer = setTimeout(() => { try { activeInst.triggerRelease(note); } catch {}; if (lastNote === note) lastNote = null; }, AUTO_RELEASE);
   } catch {}
@@ -318,3 +346,4 @@ function addLib(entry) {
 }
 
 setStatus("idle", "idle");
+renderDebug();
