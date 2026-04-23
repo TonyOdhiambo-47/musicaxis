@@ -40,8 +40,10 @@
       wsConnecting: false,
       recentEvents: [],
       alpha0: null,
-      gamma0: null,      // calibrated centre (γ at the moment of Start)
-      rotRange: 55,      // ±55° of γ-delta → full scale width (racing-game feel)
+      gamma0: null,
+      beta0: null,
+      rotRange: 55,      // ±55° of tilt-delta → full scale width
+      axis: "gamma",     // which axis is "tilt L/R" — flips with screen orientation
     };
     const HZ = 30;
     const INT = 1000 / HZ;
@@ -176,18 +178,32 @@
       };
     }
 
-    function calibrate() {
-      state.gamma0 = state.gamma;
-      state.alpha0 = state.alpha;
-      dom.note.textContent = "center set";
-      setTimeout(() => { dom.note.textContent = state.latestNote; }, 700);
+    function pickAxis() {
+      // On Android/iOS deviceorientation is in the device frame — it does NOT
+      // re-map when the user rotates the screen. So in landscape, "tilt the
+      // short ends up/down" is β (pitch), not γ (roll).
+      const angle = (screen.orientation?.angle ?? window.orientation ?? 0) | 0;
+      if (angle === 90 || angle === 270) state.axis = "beta";
+      else state.axis = "gamma";
     }
-    // Racing-game tilt: γ (roll around long axis) with a calibrated centre.
-    // Wherever you're holding the phone when you tap Start = 0°. Tilt the
-    // "wheel" left/right from there. Works portrait and landscape identical.
+    function calibrate() {
+      pickAxis();
+      state.gamma0 = state.gamma;
+      state.beta0 = state.beta;
+      state.alpha0 = state.alpha;
+      dom.note.textContent = `center set · tilt=${state.axis}`;
+      setTimeout(() => { dom.note.textContent = state.latestNote; }, 900);
+    }
+    // Racing-game tilt: whichever axis lives along the user's "left/right"
+    // given the current screen orientation, with a calibrated centre.
     function effectiveGamma() {
-      if (state.gamma0 == null) state.gamma0 = state.gamma;
-      const delta = state.gamma - state.gamma0;
+      const angle = (screen.orientation?.angle ?? window.orientation ?? 0) | 0;
+      let raw, base, sign = 1;
+      if (angle === 90) { raw = state.beta;  base = state.beta0  ?? 0; sign = -1; } // top on right
+      else if (angle === 270) { raw = state.beta; base = state.beta0 ?? 0; sign = 1; } // top on left
+      else { raw = state.gamma; base = state.gamma0 ?? 0; sign = 1; } // portrait
+      if (base == null || isNaN(base)) base = raw;
+      const delta = sign * (raw - base);
       return Math.max(-state.rotRange, Math.min(state.rotRange, delta));
     }
 
@@ -198,17 +214,27 @@
         state.beta = e.beta || 0;
         state.gamma = e.gamma || 0;
         if (state.gamma0 == null) state.gamma0 = state.gamma;
+        if (state.beta0  == null) state.beta0  = state.beta;
         if (state.alpha0 == null) state.alpha0 = state.alpha;
         paint();
         const now = performance.now();
         if (now - last < INT) return;
         last = now;
-        // Use α-derived gamma — much bigger range than raw roll γ, works in any orientation.
-        send({ type: "orient", alpha: state.alpha, beta: state.beta, gamma: effectiveGamma() });
+        // Send the orientation-aware effective tilt as "gamma" — stage logic is unchanged.
+        send({ type: "orient", alpha: state.alpha, beta: state.beta, gamma: effectiveGamma(), axis: state.axis });
       };
       window.addEventListener("deviceorientation", h);
       window.addEventListener("deviceorientationabsolute", h);
       document.getElementById("recenter")?.addEventListener("click", calibrate);
+      // Re-pick the axis + recalibrate the second the user rotates the phone.
+      const onRotate = () => {
+        pickAxis();
+        state.gamma0 = state.gamma;
+        state.beta0  = state.beta;
+      };
+      screen.orientation?.addEventListener?.("change", onRotate);
+      window.addEventListener("orientationchange", onRotate);
+      pickAxis();
       addEventLine("orientation listeners attached");
     }
 
