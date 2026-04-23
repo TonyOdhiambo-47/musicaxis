@@ -211,7 +211,7 @@ legend {
   font-variant-numeric: tabular-nums;
 }
 
-#song-wrap select {
+select, textarea {
   width: 100%;
   background: var(--bg);
   color: var(--fg);
@@ -221,7 +221,19 @@ legend {
   font-family: inherit;
   font-size: 14px;
 }
-#song-wrap select:focus { outline: 1px solid var(--accent); }
+textarea { min-height: 64px; resize: vertical; font-family: ui-monospace, monospace; font-size: 12px; }
+select:focus, textarea:focus { outline: 1px solid var(--accent); }
+.lil-btn {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--fg);
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  margin-top: 6px;
+}
+.lil-btn:hover { border-color: var(--accent); color: var(--accent); }
 .song-now {
   display: flex;
   align-items: center;

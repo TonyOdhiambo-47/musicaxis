@@ -284,8 +284,74 @@ function songCurrentTarget() {
   if (!step) return null;
   const [idx, octShift] = step;
   const pitch = SCALES[song.active.scale][idx];
-  return { idx, pitch, octave: BASE_OCTAVE + octShift, note: `${pitch}${BASE_OCTAVE + octShift}` };
+  const octave = BASE_OCTAVE + octShift;
+  // The exact γ angle that picks this scale index (zone centre)
+  const scale = SCALES[song.active.scale];
+  const zw = (2 * GAMMA_RANGE) / scale.length;
+  const gamma = (idx + 0.5) * zw - GAMMA_RANGE;
+  return { idx, pitch, octave, note: `${pitch}${octave}`, gamma: Math.round(gamma) };
 }
+// ─── Paste-your-own-tab parser ────────────────────────────────────────
+// Accepts "C4 D#4 E4 G4", "C4,D#4,E4", "C D# E G" (defaults to octave 4),
+// or a newline-separated list. Everything that doesn't match a note is ignored.
+function parsePastedNotes(raw) {
+  if (!raw) return [];
+  const tokens = raw
+    .replace(/[|()\[\]\-_.,;:/]+/g, " ")
+    .split(/\s+/)
+    .map((t) => t.trim())
+    .filter(Boolean);
+  const re = /^([A-Ga-g])([#b]?)(\d)?$/;
+  const out = [];
+  for (const tok of tokens) {
+    const m = re.exec(tok);
+    if (!m) continue;
+    let pc = m[1].toUpperCase();
+    if (m[2] === "#") pc += "#";
+    if (m[2] === "b") {
+      // convert flats to sharps so they match chromatic scale keys
+      const enh = { Cb: "B", Db: "C#", Eb: "D#", Fb: "E", Gb: "F#", Ab: "G#", Bb: "A#" };
+      pc = enh[pc + "b"] || pc;
+    }
+    const oct = m[3] ? parseInt(m[3], 10) : 4;
+    const chromatic = SCALES.chromatic;
+    const idx = chromatic.indexOf(pc);
+    if (idx < 0) continue;
+    out.push([idx, oct - BASE_OCTAVE, 1]);
+  }
+  return out;
+}
+
+function usePastedSong() {
+  const ta = document.getElementById("paste-box");
+  if (!ta) return;
+  const steps = parsePastedNotes(ta.value);
+  if (steps.length === 0) return;
+  const custom = {
+    name: "Your paste",
+    tag: `${steps.length} notes · chromatic`,
+    scale: "chromatic",
+    bpm: 100,
+    steps,
+  };
+  SONGBOOK.__custom = custom;
+  if (songPick) {
+    let opt = songPick.querySelector('option[value="__custom"]');
+    if (!opt) {
+      opt = document.createElement("option");
+      opt.value = "__custom";
+      opt.textContent = `★ your pasted tab (${steps.length} notes)`;
+      songPick.appendChild(opt);
+    } else {
+      opt.textContent = `★ your pasted tab (${steps.length} notes)`;
+    }
+    songPick.value = "__custom";
+  }
+  songStart("__custom");
+}
+
+document.getElementById("paste-btn")?.addEventListener("click", usePastedSong);
+
 function songAdvanceIfMatched() {
   if (!song.active) return;
   const tgt = songCurrentTarget();
@@ -373,7 +439,7 @@ function pushPreview() {
       octave: z.octave,
       scale: SCALES[state.scale],
       scaleName: state.scale,
-      target: tgt ? { idx: tgt.idx, octave: tgt.octave, note: tgt.note } : null,
+      target: tgt ? { idx: tgt.idx, octave: tgt.octave, note: tgt.note, gamma: tgt.gamma } : null,
     }));
   } catch {}
 }

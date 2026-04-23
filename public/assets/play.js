@@ -163,6 +163,7 @@
                 const tgtOct = m.target.octave;
                 const arrow = tgtOct > m.octave ? "↑" : tgtOct < m.octave ? "↓" : "·";
                 txt += `  →  ${m.target.note} ${arrow}`;
+                if (typeof m.target.gamma === "number") txt += `  (γ ${m.target.gamma}°)`;
               }
               dom.oct.textContent = txt;
             }

@@ -80,7 +80,24 @@
             <span class="song-progress"><span id="song-step">0</span>/<span id="song-total">0</span></span>
           </p>
           <p class="hint" id="song-hint" hidden>the phone strip lights green on the NEXT note · tap when aligned</p>
+          <button id="gen-btn" type="button" class="lil-btn">🎲 generate melody</button>
         </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>backing · chord progression</legend>
+        <select id="prog-pick">
+          <option value="">— none —</option>
+        </select>
+        <p class="hint" id="prog-now" hidden>now: <b id="prog-chord">—</b></p>
+        <p class="hint">a backing drone cycles through the chords while you improvise — every tilt sounds like a song</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>paste your own tab</legend>
+        <textarea id="paste-box" placeholder="paste notes — e.g. C4 D4 E4 G4 A4 G4 E4 D4 C4"></textarea>
+        <button id="paste-btn" type="button" class="lil-btn">use as guide</button>
+        <p class="hint">works with letter notation (C, D#4, Bb3...). find a tab for any song and paste it here.</p>
       </fieldset>
 
       <fieldset>
