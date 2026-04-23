@@ -81,42 +81,62 @@ export class MasterBus {
 export const instrumentFactory = {
 
   // 1. GRAND PIANO — Tone.Sampler with tonejs-instruments piano samples.
-  // Uses a sparse set of root notes and lets Tone pitch-shift between them.
-  // Small download (~1.5 MB), quick load, real piano feel.
+  // If samples don't load in time we transparently fall back to a poly-synth
+  // so the instrument always produces sound.
   async piano(onProgress, dest) {
     const base = "https://nbrosowsky.github.io/tonejs-instruments/samples/piano/";
-    // Keep the sample set tiny — Tone pitch-shifts everything in between.
-    const urls = {
-      C3: "C3.mp3", C4: "C4.mp3", C5: "C5.mp3", C6: "C6.mp3",
-    };
+    const urls = { C3: "C3.mp3", C4: "C4.mp3", C5: "C5.mp3", C6: "C6.mp3" };
 
+    // immediate audible fallback — swap it out once the sampler loads
+    const fallback = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: "triangle" },
+      envelope: { attack: 0.005, decay: 0.2, sustain: 0.3, release: 1.0 },
+    });
+    fallback.volume.value = -8;
+    fallback.connect(dest);
+
+    const handle = { loaded: false };
+    let sampler = null;
+
+    // progress ticker
     let done = false;
     (async () => {
-      const total = 1200;
       const start = Date.now();
       while (!done) {
-        onProgress?.(Math.min(0.92, (Date.now() - start) / total));
+        onProgress?.(Math.min(0.92, (Date.now() - start) / 1200));
         await new Promise((r) => setTimeout(r, 60));
       }
     })();
 
-    const sampler = await new Promise((resolve) => {
-      const s = new Tone.Sampler({
-        urls, baseUrl: base, release: 1.2,
-        onload: () => resolve(s),
-        onerror: () => resolve(s),
+    (async () => {
+      await new Promise((resolve) => {
+        const s = new Tone.Sampler({
+          urls, baseUrl: base, release: 1.2,
+          onload: () => { sampler = s; handle.loaded = true; resolve(); },
+          onerror: () => resolve(),
+        });
+        s.volume.value = -4;
+        s.connect(dest);
+        setTimeout(resolve, 6000);
       });
-      s.volume.value = -4;
-      s.connect(dest);
-      setTimeout(() => resolve(s), 5000); // bail fast — silence beats hang
-    });
+      done = true;
+      onProgress?.(1);
+    })();
+
+    // Return straight away so startEngine doesn't block on the samples.
     done = true;
     onProgress?.(1);
 
     return {
-      triggerAttack: (note, time, vel) => sampler.triggerAttack(note, time, vel),
-      triggerRelease: (note) => sampler.triggerRelease(note, "+0.01"),
-      dispose: () => sampler.disconnect(),
+      triggerAttack: (note, time, vel) => {
+        if (handle.loaded && sampler) sampler.triggerAttack(note, time, vel);
+        else fallback.triggerAttack(note, time, vel);
+      },
+      triggerRelease: (note) => {
+        if (handle.loaded && sampler) sampler.triggerRelease(note, "+0.01");
+        else fallback.triggerRelease(note);
+      },
+      dispose: () => { try { sampler?.disconnect(); } catch {}; try { fallback.disconnect(); } catch {} },
     };
   },
 

@@ -144,11 +144,21 @@ function setFill(p) { dom.loaderFill.style.width = `${Math.round(Math.min(1, Mat
 
 dom.startBtn.addEventListener("click", () => { startEngine().catch(console.error); }, { once: true });
 
+// Test note — proves audio chain works without needing a phone.
+document.getElementById("test-btn")?.addEventListener("click", () => {
+  if (!activeInst) { setStatus("error", "tap Start first"); return; }
+  try {
+    activeInst.triggerAttack("A4", undefined, 0.8);
+    setTimeout(() => { try { activeInst.triggerRelease("A4"); } catch {} }, 600);
+    dom.note.textContent = "A4";
+  } catch (e) { console.error(e); }
+});
+
 // inst/scale pills
 dom.insts.forEach((b) => b.addEventListener("click", () => {
   dom.insts.forEach((x) => x.classList.toggle("active", x === b));
   state.currentInst = b.dataset.inst;
-  activeInst = instruments[state.currentInst];
+  activeInst = instruments[state.currentInst] || instruments.synth || activeInst;
 }));
 dom.scales.forEach((b) => b.addEventListener("click", () => {
   dom.scales.forEach((x) => x.classList.toggle("active", x === b));

@@ -220,7 +220,8 @@ setInterval(() => {
   }
 }, 30_000).unref();
 
-server.listen(PORT, () => {
+// Bind 0.0.0.0 so phones on the LAN (IPv4) can reach us.
+server.listen(PORT, '0.0.0.0', () => {
   const proto = USE_HTTPS ? 'https' : 'http';
   console.log(`[musicaxis] ${proto}://localhost:${PORT}`);
   console.log(`[musicaxis] stage: ${proto}://localhost:${PORT}/`);
