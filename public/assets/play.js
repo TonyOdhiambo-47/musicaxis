@@ -39,6 +39,8 @@
       listenersAttached: false,
       wsConnecting: false,
       recentEvents: [],
+      alpha0: null,      // calibrated "center" — so rotating L/R works in any orientation
+      rotRange: 90,      // ±90° of α-delta → full scale width
     };
     const HZ = 30;
     const INT = 1000 / HZ;
@@ -173,20 +175,37 @@
       };
     }
 
+    function calibrate() {
+      state.alpha0 = state.alpha;
+      dom.note.textContent = "center set";
+      setTimeout(() => { dom.note.textContent = state.latestNote; }, 700);
+    }
+    // Turn the current α into a pseudo-γ that says how far the user has
+    // rotated from the moment they tapped Start. Works identically in
+    // portrait and landscape — whole ±90° of easy wrist travel.
+    function effectiveGamma() {
+      if (state.alpha0 == null) state.alpha0 = state.alpha;
+      const delta = ((state.alpha - state.alpha0 + 540) % 360) - 180;
+      return Math.max(-state.rotRange, Math.min(state.rotRange, delta));
+    }
+
     function attachOrient() {
       const h = (e) => {
         if (e.alpha == null && e.beta == null && e.gamma == null) return;
         state.alpha = e.alpha || 0;
         state.beta = e.beta || 0;
         state.gamma = e.gamma || 0;
+        if (state.alpha0 == null) state.alpha0 = state.alpha;
         paint();
         const now = performance.now();
         if (now - last < INT) return;
         last = now;
-        send({ type: "orient", alpha: state.alpha, beta: state.beta, gamma: state.gamma });
+        // Use α-derived gamma — much bigger range than raw roll γ, works in any orientation.
+        send({ type: "orient", alpha: state.alpha, beta: state.beta, gamma: effectiveGamma() });
       };
       window.addEventListener("deviceorientation", h);
       window.addEventListener("deviceorientationabsolute", h);
+      document.getElementById("recenter")?.addEventListener("click", calibrate);
       addEventLine("orientation listeners attached");
     }
 

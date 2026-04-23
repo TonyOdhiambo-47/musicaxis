@@ -403,7 +403,7 @@ function updateViz() {
   const pct = ((g + GAMMA_RANGE) / (2 * GAMMA_RANGE)) * 100;
   if (dom.stripCurrent) dom.stripCurrent.style.left = `${pct.toFixed(2)}%`;
 
-  // Highlight the current scale cell
+  // Highlight the current scale cell + the snap zone around the target
   const cur = currentZoneInfo();
   const cells = dom.stripCells?.children;
   if (cells) {
@@ -411,6 +411,8 @@ function updateViz() {
     for (let i = 0; i < cells.length; i++) {
       const c = cells[i];
       c.classList.toggle("active", i === cur.idx);
+      const inSnap = !!tgt && Math.abs(i - tgt.idx) <= SNAP_RADIUS;
+      c.classList.toggle("snap", inSnap && i !== tgt.idx);
       c.classList.toggle("hit", !!tgt && i === tgt.idx && cur.idx === tgt.idx && cur.octave === tgt.octave);
     }
   }
@@ -507,9 +509,30 @@ function velocity(beta) {
 }
 
 let heldNote = null;
+const SNAP_RADIUS = 2;     // scale cells of forgiveness around the target
+function resolveNote() {
+  // If a song guide is active, snap to the target when close enough.
+  // If far away, silence — keeps the melody correct even when aim is loose.
+  const tgt = songCurrentTarget?.();
+  if (tgt) {
+    const cur = currentZoneInfo();
+    const dx = Math.abs(cur.idx - tgt.idx);
+    const dOct = Math.abs(cur.octave - tgt.octave);
+    if (dx <= SNAP_RADIUS && dOct <= 1) return tgt.note;
+    return null; // outside the magnet radius — play nothing
+  }
+  return currentZoneNote();
+}
+
 function holdStart() {
   if (!activeInst) return;
-  const note = currentZoneNote();
+  const note = resolveNote();
+  if (!note) {
+    // too far from target — flash the big note so the user knows we heard the tap
+    dom.note.textContent = "✗";
+    setTimeout(() => { dom.note.textContent = state.lastNote; }, 350);
+    return;
+  }
   try {
     if (heldNote && !activeInst.mono) activeInst.triggerRelease?.(heldNote);
     activeInst.triggerAttack(note, undefined, velocity(state.orient.beta));
@@ -542,7 +565,8 @@ function holdEnd() {
 // retrigger when the zone actually changes.
 function slideToCurrentZone() {
   if (!activeInst || !state.holding) return;
-  const note = currentZoneNote();
+  const note = resolveNote();
+  if (!note) return; // outside snap radius — hold the last note
   if (activeInst.mono) {
     // Continuous portamento — slide.
     try { activeInst.slide?.(note); } catch {}

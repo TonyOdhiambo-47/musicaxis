@@ -155,6 +155,10 @@ main {
   background: var(--accent);
   color: var(--bg);
 }
+#strip-cells .scell.snap {
+  background: rgba(217,74,46,0.18);
+  color: var(--fg);
+}
 #strip-cells .scell.hit {
   background: #6acc6a;
   color: var(--bg);
