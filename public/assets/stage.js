@@ -9,7 +9,10 @@ const dom = {
   qr: $("qr"),
   qrUrl: $("qr-url"),
   vizWrap: $("viz-wrap"),
-  vizDot: $("viz-dot"),
+  stripCells: $("strip-cells"),
+  stripCurrent: $("strip-current"),
+  stripTarget: $("strip-target"),
+  octLine: $("oct-line"),
   note: $("note"),
   values: $("values"),
   dot: $("dot"),
@@ -67,6 +70,7 @@ function connectWS() {
         state.paired = true;
         dom.qrWrap.hidden = true;
         dom.vizWrap.hidden = false;
+        renderStripCells();
         setStatus("paired", "phone connected");
       }
     };
@@ -223,6 +227,7 @@ dom.scales.forEach((b) => b.addEventListener("click", () => {
   dom.scales.forEach((x) => x.classList.toggle("active", x === b));
   state.scale = b.dataset.scale;
   previewKey = "";
+  renderStripCells();
   pushPreview();
   if (drone) drone.setRoot(SCALE_ROOT[state.scale] || "A");
   if (song.active) songStop();
@@ -267,7 +272,9 @@ function songStart(id) {
   songTotal.textContent = s.steps.length;
   songStep.textContent = 0;
   previewKey = "";
+  renderStripCells();
   pushPreview();
+  updateTargetHint();
 }
 function songStop() {
   song.active = null;
@@ -391,10 +398,60 @@ function onOrient(msg) {
 }
 
 function updateViz() {
-  const x = Math.max(-1, Math.min(1, state.orient.gamma / 60)) * 70;
-  const y = -Math.max(-1, Math.min(1, state.orient.beta / 60)) * 70;
-  dom.vizDot.style.transform = `translate(${x}px, ${y}px)`;
+  // Slide the amber "current" dot along the strip as a percent of γ range.
+  const g = Math.max(-GAMMA_RANGE, Math.min(GAMMA_RANGE, state.orient.gamma));
+  const pct = ((g + GAMMA_RANGE) / (2 * GAMMA_RANGE)) * 100;
+  if (dom.stripCurrent) dom.stripCurrent.style.left = `${pct.toFixed(2)}%`;
+
+  // Highlight the current scale cell
+  const cur = currentZoneInfo();
+  const cells = dom.stripCells?.children;
+  if (cells) {
+    const tgt = songCurrentTarget?.();
+    for (let i = 0; i < cells.length; i++) {
+      const c = cells[i];
+      c.classList.toggle("active", i === cur.idx);
+      c.classList.toggle("hit", !!tgt && i === tgt.idx && cur.idx === tgt.idx && cur.octave === tgt.octave);
+    }
+  }
+
+  // Red target dot + text indicator
+  updateTargetHint();
+
   dom.values.textContent = `α ${Math.round(state.orient.alpha)} · β ${Math.round(state.orient.beta)} · γ ${Math.round(state.orient.gamma)}`;
+}
+
+function updateTargetHint() {
+  const tgt = songCurrentTarget?.();
+  if (!tgt || !dom.stripTarget) {
+    if (dom.stripTarget) dom.stripTarget.hidden = true;
+    if (dom.octLine) dom.octLine.textContent = `oct ${currentZoneInfo().octave}`;
+    return;
+  }
+  const tgtPct = ((tgt.gamma + GAMMA_RANGE) / (2 * GAMMA_RANGE)) * 100;
+  dom.stripTarget.hidden = false;
+  dom.stripTarget.style.left = `${tgtPct.toFixed(2)}%`;
+  const cur = currentZoneInfo();
+  const arrow = tgt.octave > cur.octave ? "↑" : tgt.octave < cur.octave ? "↓" : "·";
+  if (dom.octLine) {
+    dom.octLine.innerHTML = `oct ${cur.octave} &nbsp;→&nbsp; <span class="tgt">${tgt.note} ${arrow} (γ ${tgt.gamma}°)</span>`;
+  }
+}
+
+function renderStripCells() {
+  if (!dom.stripCells) return;
+  const scale = SCALES[state.scale];
+  const cur = dom.stripCells.dataset.scale || "";
+  const key = scale.join(",");
+  if (cur === key) return;
+  dom.stripCells.innerHTML = "";
+  for (const pc of scale) {
+    const cell = document.createElement("div");
+    cell.className = "scell";
+    cell.textContent = pc;
+    dom.stripCells.appendChild(cell);
+  }
+  dom.stripCells.dataset.scale = key;
 }
 
 // ── Clear convention ────────────────────────────────────────────────
