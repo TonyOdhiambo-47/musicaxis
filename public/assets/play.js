@@ -22,6 +22,7 @@
     const dom = {
       gate: $("gate"), pad: $("pad"), sid: $("sid"), go: $("go"),
       gateHint: $("gate-hint"), fatal: $("fatal"),
+      tiltFill: $("tilt-fill"),
       note: $("note"), oct: $("oct"), strip: $("strip"), ro: $("ro"),
       sdot: $("sdot"), stext: $("stext"),
     };
@@ -31,9 +32,9 @@
     dom.sid.textContent = sid || "—";
 
     const state = {
-      alpha: 0,
-      beta: 0,
-      gamma: 0,
+      alpha: null,
+      beta: null,
+      gamma: null,
       holding: false,
       latestNote: "—",
       listenersAttached: false,
@@ -44,12 +45,30 @@
       beta0: null,
       rotRange: 55,      // ±55° of tilt-delta → full scale width
       axis: "gamma",     // which axis is "tilt L/R" — flips with screen orientation
+      orientSource: null,
+      needsBaselineCapture: true,
     };
     const HZ = 30;
     const INT = 1000 / HZ;
     let last = 0;
+    let lastVisual = 0;
     let wsReady = false;
     let ws = null;
+
+    function isFiniteNumber(value) {
+      return typeof value === "number" && Number.isFinite(value);
+    }
+
+    function readAngle() {
+      return (screen.orientation?.angle ?? window.orientation ?? 0) | 0;
+    }
+
+    function captureBaseline() {
+      if (isFiniteNumber(state.gamma)) state.gamma0 = state.gamma;
+      if (isFiniteNumber(state.beta)) state.beta0 = state.beta;
+      if (isFiniteNumber(state.alpha)) state.alpha0 = state.alpha;
+      state.needsBaselineCapture = false;
+    }
 
     function addEventLine() { /* event log removed — keeping stub in case of legacy calls */ }
 
@@ -59,7 +78,8 @@
     }
 
     function paint() {
-      dom.ro.innerHTML = `α <b>${Math.round(state.alpha)}</b> · β <b>${Math.round(state.beta)}</b> · γ <b>${Math.round(state.gamma)}</b>`;
+      const show = (value) => (isFiniteNumber(value) ? Math.round(value) : "—");
+      dom.ro.innerHTML = `α <b>${show(state.alpha)}</b> · β <b>${show(state.beta)}</b> · γ <b>${show(state.gamma)}</b>`;
     }
 
     function renderStrip(scale, activeIdx, targetIdx) {
@@ -182,40 +202,75 @@
       // On Android/iOS deviceorientation is in the device frame — it does NOT
       // re-map when the user rotates the screen. So in landscape, "tilt the
       // short ends up/down" is β (pitch), not γ (roll).
-      const angle = (screen.orientation?.angle ?? window.orientation ?? 0) | 0;
+      const angle = readAngle();
       if (angle === 90 || angle === 270) state.axis = "beta";
       else state.axis = "gamma";
     }
     function calibrate() {
       pickAxis();
-      state.gamma0 = state.gamma;
-      state.beta0 = state.beta;
-      state.alpha0 = state.alpha;
-      dom.note.textContent = `center set · tilt=${state.axis}`;
+      if (isFiniteNumber(state.beta) || isFiniteNumber(state.gamma) || isFiniteNumber(state.alpha)) {
+        captureBaseline();
+        dom.note.textContent = `center set · tilt=${state.axis}`;
+      } else {
+        state.needsBaselineCapture = true;
+        dom.note.textContent = `waiting for motion · tilt=${state.axis}`;
+      }
       setTimeout(() => { dom.note.textContent = state.latestNote; }, 900);
     }
     // Racing-game tilt: whichever axis lives along the user's "left/right"
     // given the current screen orientation, with a calibrated centre.
     function effectiveGamma() {
-      const angle = (screen.orientation?.angle ?? window.orientation ?? 0) | 0;
+      const angle = readAngle();
       let raw, base, sign = 1;
       if (angle === 90) { raw = state.beta;  base = state.beta0  ?? 0; sign = -1; } // top on right
       else if (angle === 270) { raw = state.beta; base = state.beta0 ?? 0; sign = 1; } // top on left
       else { raw = state.gamma; base = state.gamma0 ?? 0; sign = 1; } // portrait
+      if (!isFiniteNumber(raw)) return 0;
       if (base == null || isNaN(base)) base = raw;
       const delta = sign * (raw - base);
       return Math.max(-state.rotRange, Math.min(state.rotRange, delta));
     }
 
+    function paintTiltBar() {
+      if (!dom.tiltFill) return;
+      const clamped = effectiveGamma();
+      const half = 50;
+      const width = Math.abs(clamped) / state.rotRange * half;
+      dom.tiltFill.style.left = `${clamped < 0 ? half - width : half}%`;
+      dom.tiltFill.style.width = `${width}%`;
+      dom.tiltFill.dataset.side = clamped < 0 ? "left" : clamped > 0 ? "right" : "center";
+    }
+
+    function animateVisuals(now) {
+      if (!lastVisual || now - lastVisual >= INT) {
+        lastVisual = now;
+        paintTiltBar();
+      }
+      requestAnimationFrame(animateVisuals);
+    }
+
     function attachOrient() {
       const h = (e) => {
-        if (e.alpha == null && e.beta == null && e.gamma == null) return;
-        state.alpha = e.alpha || 0;
-        state.beta = e.beta || 0;
-        state.gamma = e.gamma || 0;
-        if (state.gamma0 == null) state.gamma0 = state.gamma;
-        if (state.beta0  == null) state.beta0  = state.beta;
-        if (state.alpha0 == null) state.alpha0 = state.alpha;
+        const source = e.type === "deviceorientationabsolute" ? "absolute" : "relative";
+        if (source === "relative" && state.orientSource === "absolute") return;
+        if (source === "absolute" && state.orientSource !== "absolute") {
+          state.orientSource = "absolute";
+          state.needsBaselineCapture = true;
+        } else if (!state.orientSource) {
+          state.orientSource = source;
+        }
+
+        const hasAlpha = isFiniteNumber(e.alpha);
+        const hasBeta = isFiniteNumber(e.beta);
+        const hasGamma = isFiniteNumber(e.gamma);
+        if (!hasAlpha && !hasBeta && !hasGamma) return;
+
+        if (hasAlpha) state.alpha = e.alpha;
+        if (hasBeta) state.beta = e.beta;
+        if (hasGamma) state.gamma = e.gamma;
+        if (state.needsBaselineCapture && (isFiniteNumber(state.beta) || isFiniteNumber(state.gamma) || isFiniteNumber(state.alpha))) {
+          captureBaseline();
+        }
         paint();
         const now = performance.now();
         if (now - last < INT) return;
@@ -226,11 +281,11 @@
       window.addEventListener("deviceorientation", h);
       window.addEventListener("deviceorientationabsolute", h);
       document.getElementById("recenter")?.addEventListener("click", calibrate);
-      // Re-pick the axis + recalibrate the second the user rotates the phone.
+      // Re-pick the axis immediately, then re-capture baselines on the first
+      // post-rotate sensor sample so we do not freeze in stale pre-rotate data.
       const onRotate = () => {
         pickAxis();
-        state.gamma0 = state.gamma;
-        state.beta0  = state.beta;
+        state.needsBaselineCapture = true;
       };
       screen.orientation?.addEventListener?.("change", onRotate);
       window.addEventListener("orientationchange", onRotate);
@@ -284,6 +339,8 @@
     }
 
     paint();
+    paintTiltBar();
+    requestAnimationFrame(animateVisuals);
     addEventLine("events: waiting for Start");
     dom.go.addEventListener("click", () => {
       startController().catch((error) => {

@@ -62,6 +62,46 @@ h1 {
   position: relative;
 }
 
+.tilt-meter {
+  position: relative;
+  width: 100%;
+  max-width: 28rem;
+  height: 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, rgba(217,74,46,0.18), rgba(217,74,46,0.02) 34%, rgba(232,160,79,0.04) 50%, rgba(155,211,154,0.02) 66%, rgba(155,211,154,0.18));
+  overflow: hidden;
+}
+
+.tilt-meter__fill {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  left: 50%;
+  width: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), var(--ok));
+  transition: width 50ms linear, left 50ms linear;
+}
+
+.tilt-meter__fill[data-side="left"] {
+  background: linear-gradient(90deg, var(--rec), var(--accent));
+}
+
+.tilt-meter__fill[data-side="center"] {
+  background: var(--accent);
+}
+
+.tilt-meter__center {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  left: calc(50% - 1px);
+  width: 2px;
+  background: rgba(241,231,208,0.8);
+}
+
 .octave {
   font-family: ui-monospace, monospace;
   font-size: 13px;
