@@ -81,15 +81,16 @@ function connectWS() {
 
 function setStatus(s, txt) { dom.dot.dataset.state = s; dom.status.textContent = txt; }
 
-async function renderQR() {
+function renderQR() {
   const url = `${location.protocol}//${location.host}/play?s=${sid}`;
   dom.qrUrl.textContent = url;
   dom.qr.innerHTML = "";
   try {
-    const dataUrl = await QRCode.toDataURL(url, {
-      errorCorrectionLevel: "M", margin: 1, width: 220,
-      color: { dark: "#0b0a08ff", light: "#f1e7d0ff" },
-    });
+    // qrcode-generator UMD: window.qrcode(typeNumber, errorCorrectionLevel)
+    const qr = window.qrcode(0, "M");
+    qr.addData(url);
+    qr.make();
+    const dataUrl = qr.createDataURL(6, 2); // cellSize=6, margin=2
     const img = new Image();
     img.src = dataUrl;
     img.width = 200; img.height = 200;
@@ -134,7 +135,7 @@ async function startEngine() {
     dom.loader.hidden = true;
     dom.startWrap.hidden = true;
     dom.qrWrap.hidden = false;
-    try { await renderQR(); } catch (e) { console.error(e); }
+    try { renderQR(); } catch (e) { console.error(e); }
     connectWS();
   }
 }
