@@ -1,4 +1,5 @@
 import { SCALES, SCALE_ROOT, instrumentFactory, MasterBus, DroneBed } from "/assets/engine.js";
+import { SONGBOOK } from "/assets/songbook.js";
 
 const $ = (id) => document.getElementById(id);
 const dom = {
@@ -224,7 +225,83 @@ dom.scales.forEach((b) => b.addEventListener("click", () => {
   previewKey = "";
   pushPreview();
   if (drone) drone.setRoot(SCALE_ROOT[state.scale] || "A");
+  if (song.active) songStop();
 }));
+
+// ─── Songbook / guide mode ────────────────────────────────────────────
+const song = { active: null, stepIdx: 0, lastAdvance: 0 };
+const songPick = document.getElementById("song-pick");
+const songNow = document.getElementById("song-now");
+const songTitle = document.getElementById("song-title");
+const songStep = document.getElementById("song-step");
+const songTotal = document.getElementById("song-total");
+const songHint = document.getElementById("song-hint");
+
+(function populateSongs() {
+  if (!songPick) return;
+  for (const [id, s] of Object.entries(SONGBOOK)) {
+    const opt = document.createElement("option");
+    opt.value = id;
+    opt.textContent = `${s.name}  ·  ${s.tag}`;
+    songPick.appendChild(opt);
+  }
+  songPick.addEventListener("change", () => {
+    const id = songPick.value;
+    if (!id) { songStop(); return; }
+    songStart(id);
+  });
+})();
+
+function songStart(id) {
+  const s = SONGBOOK[id];
+  if (!s) return;
+  song.active = s;
+  song.stepIdx = 0;
+  // auto-switch scale + drone root
+  state.scale = s.scale;
+  dom.scales.forEach((b) => b.classList.toggle("active", b.dataset.scale === s.scale));
+  if (drone) drone.setRoot(SCALE_ROOT[s.scale] || "A");
+  songNow.hidden = false;
+  songHint.hidden = false;
+  songTitle.textContent = s.name;
+  songTotal.textContent = s.steps.length;
+  songStep.textContent = 0;
+  previewKey = "";
+  pushPreview();
+}
+function songStop() {
+  song.active = null;
+  song.stepIdx = 0;
+  songNow.hidden = true;
+  songHint.hidden = true;
+  if (songPick) songPick.value = "";
+  previewKey = "";
+  pushPreview();
+}
+function songCurrentTarget() {
+  if (!song.active) return null;
+  const step = song.active.steps[song.stepIdx];
+  if (!step) return null;
+  const [idx, octShift] = step;
+  const pitch = SCALES[song.active.scale][idx];
+  return { idx, pitch, octave: BASE_OCTAVE + octShift, note: `${pitch}${BASE_OCTAVE + octShift}` };
+}
+function songAdvanceIfMatched() {
+  if (!song.active) return;
+  const tgt = songCurrentTarget();
+  if (!tgt) return;
+  const got = currentZoneInfo();
+  if (got.idx === tgt.idx && got.octave === tgt.octave) {
+    song.stepIdx = Math.min(song.stepIdx + 1, song.active.steps.length);
+    songStep.textContent = song.stepIdx;
+    if (song.stepIdx >= song.active.steps.length) {
+      songTitle.textContent = `${song.active.name} ✓ complete`;
+      setTimeout(songStop, 3000);
+    }
+    previewKey = "";
+    pushPreview();
+  }
+}
 
 // ─── Orientation / note mapping ─────────────────────────────────
 // γ (-60..60) picks the scale index · β opens the master filter
@@ -278,12 +355,14 @@ function currentZoneInfo() {
 function currentZoneNote() { return currentZoneInfo().note; }
 
 // Push the preview note + zone index + scale layout to the phone so it
-// can show a scale strip with the current note highlighted.
+// can show a scale strip with the current note highlighted. Also push
+// the songbook target so the phone can light the next note green.
 let previewKey = "";
 function pushPreview() {
   if (!state.paired || !ws || ws.readyState !== WebSocket.OPEN) return;
   const z = currentZoneInfo();
-  const key = `${z.note}|${z.idx}|${state.scale}`;
+  const tgt = songCurrentTarget?.();
+  const key = `${z.note}|${z.idx}|${state.scale}|${tgt?.idx ?? -1}|${tgt?.octave ?? 0}`;
   if (key === previewKey) return;
   previewKey = key;
   try {
@@ -294,6 +373,7 @@ function pushPreview() {
       octave: z.octave,
       scale: SCALES[state.scale],
       scaleName: state.scale,
+      target: tgt ? { idx: tgt.idx, octave: tgt.octave, note: tgt.note } : null,
     }));
   } catch {}
 }
@@ -322,6 +402,8 @@ function holdStart() {
     drone.fadeIn();
     if (droneTimeout) { clearTimeout(droneTimeout); droneTimeout = null; }
   }
+  // Advance the songbook if they hit the target note.
+  songAdvanceIfMatched();
 }
 function holdEnd() {
   state.holding = false;

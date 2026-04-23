@@ -57,7 +57,7 @@
       dom.ro.innerHTML = `α <b>${Math.round(state.alpha)}</b> · β <b>${Math.round(state.beta)}</b> · γ <b>${Math.round(state.gamma)}</b>`;
     }
 
-    function renderStrip(scale, activeIdx) {
+    function renderStrip(scale, activeIdx, targetIdx) {
       if (!dom.strip) return;
       const current = dom.strip.dataset.scale || "";
       const key = scale.join(",");
@@ -72,7 +72,12 @@
         dom.strip.dataset.scale = key;
       }
       const cells = dom.strip.children;
-      for (let i = 0; i < cells.length; i++) cells[i].classList.toggle("active", i === activeIdx);
+      for (let i = 0; i < cells.length; i++) {
+        const cell = cells[i];
+        cell.classList.toggle("active", i === activeIdx);
+        cell.classList.toggle("target", i === targetIdx && targetIdx !== activeIdx);
+        cell.classList.toggle("hit", i === targetIdx && i === activeIdx);
+      }
     }
 
     function send(msg) {
@@ -152,8 +157,16 @@
           if (m.type === "note") {
             state.latestNote = m.note;
             dom.note.textContent = m.note;
-            if (dom.oct) dom.oct.textContent = `oct ${m.octave ?? ""}`.trim();
-            if (Array.isArray(m.scale)) renderStrip(m.scale, m.idx ?? -1);
+            if (dom.oct) {
+              let txt = `oct ${m.octave ?? ""}`.trim();
+              if (m.target) {
+                const tgtOct = m.target.octave;
+                const arrow = tgtOct > m.octave ? "↑" : tgtOct < m.octave ? "↓" : "·";
+                txt += `  →  ${m.target.note} ${arrow}`;
+              }
+              dom.oct.textContent = txt;
+            }
+            if (Array.isArray(m.scale)) renderStrip(m.scale, m.idx ?? -1, m.target?.idx ?? -1);
           }
         } catch {}
       };
