@@ -177,7 +177,10 @@ async function startEngine() {
     dom.loaderTitle.textContent = "warming synths";
     instruments.synth = instrumentFactory.synth(master.input);
     instruments.strings = instrumentFactory.strings(master.input);
-    setFill(0.9);
+    setFill(0.82);
+    dom.loaderTitle.textContent = "stringing guitar";
+    instruments.guitar = await instrumentFactory.guitar(master.input);
+    setFill(0.93);
     dom.loaderTitle.textContent = "loading marimba";
     instruments.marimba = await instrumentFactory.marimba(master.input);
     setFill(1);
