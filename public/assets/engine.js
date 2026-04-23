@@ -221,53 +221,36 @@ export const instrumentFactory = {
   },
 };
 
-// 5. GUITAR — acoustic samples from tonejs-instruments, with a light
-// chorus-compressor-reverb chain for body. Samples cover A2–C5 and Tone
-// pitch-shifts between them, so the whole pentatonic/blues range sings.
+// 5. GUITAR — real acoustic samples, no synth fallback, no chorus gloss.
+// Pure guitar through a touch of room reverb so it sounds like a guitar
+// in a room, not a synth.
 instrumentFactory.guitar = async function (dest) {
   const base = "https://nbrosowsky.github.io/tonejs-instruments/samples/guitar-acoustic/";
   const urls = {
-    A2: "A2.mp3", C3: "C3.mp3", E3: "E3.mp3", G3: "G3.mp3",
-    C4: "C4.mp3", E4: "E4.mp3", A4: "A4.mp3", C5: "C5.mp3",
+    "A2":  "A2.mp3",  "C3":  "C3.mp3",  "D#3": "Ds3.mp3", "F#3": "Fs3.mp3",
+    "A3":  "A3.mp3",  "C4":  "C4.mp3",  "D#4": "Ds4.mp3", "F#4": "Fs4.mp3",
+    "A4":  "A4.mp3",  "C5":  "C5.mp3",
   };
-
-  // fallback: a plucked-string-ish synth while the samples load
-  const fallback = new Tone.PolySynth(Tone.PluckSynth, {
-    attackNoise: 0.4, dampening: 3000, resonance: 0.92,
-  });
-  fallback.volume.value = -10;
-
-  const reverb = new Tone.Reverb({ decay: 2.8, wet: 0.28 });
+  const reverb = new Tone.Reverb({ decay: 2.2, wet: 0.18 });
   reverb.generate();
-  const chorus = new Tone.Chorus({ frequency: 0.9, delayTime: 2.5, depth: 0.3, wet: 0.25 }).start();
-  const chain = new Tone.Gain(1);
-  chain.chain(chorus, reverb, dest);
-  fallback.connect(chain);
 
-  const handle = { loaded: false };
-  let sampler = null;
-  await new Promise((resolve) => {
+  // Wait for the samples — don't mask them with a synth stand-in.
+  const sampler = await new Promise((resolve, reject) => {
     const s = new Tone.Sampler({
-      urls, baseUrl: base, release: 1.4,
-      onload: () => { sampler = s; handle.loaded = true; resolve(); },
-      onerror: () => resolve(),
+      urls, baseUrl: base, release: 1.6,
+      onload: () => resolve(s),
+      onerror: (e) => reject(e),
     });
     s.volume.value = -4;
-    s.connect(chain);
-    setTimeout(resolve, 6000);
+    s.chain(reverb, dest);
+    setTimeout(() => resolve(s), 8000); // failsafe only
   });
 
   return {
     mono: false,
-    triggerAttack: (note, time, vel) => {
-      if (handle.loaded && sampler) sampler.triggerAttack(note, time, vel);
-      else fallback.triggerAttack(note, time, vel);
-    },
-    triggerRelease: (note) => {
-      if (handle.loaded && sampler) sampler.triggerRelease(note, "+0.01");
-      else fallback.triggerRelease(note);
-    },
-    dispose: () => { try { sampler?.disconnect(); } catch {}; try { fallback.disconnect(); } catch {}; try { chorus.disconnect(); reverb.disconnect(); chain.disconnect(); } catch {} },
+    triggerAttack: (note, time, vel) => sampler.triggerAttack(note, time, vel ?? 0.9),
+    triggerRelease: (note) => sampler.triggerRelease(note, "+0.01"),
+    dispose: () => { try { sampler.disconnect(); } catch {}; try { reverb.disconnect(); } catch {} },
   };
 };
 
