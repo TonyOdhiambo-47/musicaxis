@@ -1,4 +1,4 @@
-// MusicAxis controller — tap pad + gyroscope pointer
+// musicaxis controller — tap pad + gyroscope pointer
 (function () {
   function showFatal(message) {
     const node = document.getElementById("fatal");

@@ -1,4 +1,4 @@
-// MusicAxis — relay server
+// musicaxis — relay server
 // Desktop (stage) and phone (controller) meet in a session room. The only
 // server responsibility is to forward orientation from the controller to
 // the stage. No audio is transmitted; all audio lives on the desktop.

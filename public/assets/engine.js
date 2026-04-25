@@ -1,4 +1,4 @@
-// MusicAxis — audio engine
+// musicaxis — audio engine
 // Holds the Tone.js master bus, four instruments, and helpers for
 // scale-locked note arrays. Also exposes a MediaStream suitable for
 // MediaRecorder so the stage can capture what the audience hears.

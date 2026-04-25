@@ -1,4 +1,4 @@
-# MusicAxis
+# musicaxis
 
 > Turn a phone into a gyroscope instrument. A desktop browser is the stage,
 > the sound engine, and the recorder. The phone is the baton.
@@ -194,6 +194,6 @@ MIT. See `LICENSE`.
 
 ---
 
-*MusicAxis takes the same pattern as [ChemAxis](https://github.com/TonyOdhiambo-47/chemaxis)
+*musicaxis takes the same pattern as [ChemAxis](https://github.com/TonyOdhiambo-47/chemaxis)
 — a phone as a gyroscope companion — and points it at sound. The ritual
 doesn't change: pick up a phone, tilt it, the world responds.*

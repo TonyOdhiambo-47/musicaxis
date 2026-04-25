@@ -1,4 +1,4 @@
-// MusicAxis — songbook
+// musicaxis — songbook
 // Each song is a sequence of [scale-index, octave-shift, beats] triples.
 // The scale-index is into the song's declared scale (pitch classes, no octave).
 // The guide mode highlights the NEXT step on the phone's scale strip, and
